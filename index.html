@@ -1,0 +1,407 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>農・みのり 農薬管理</title>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --shoudoku:#1E6F7A; --jokusou:#B5651D;
+  --warn:#9A6B00; --warn-bg:#FBF3DC; --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{
+  font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  background:var(--paper); color:var(--ink); line-height:1.55;
+  font-feature-settings:"palt"; -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:480px;margin:0 auto;padding:0 14px 96px;min-height:100vh}
+/* header */
+header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand .leaf{font-size:18px}
+.brand h1{font-size:17px;margin:0;letter-spacing:.04em;font-weight:800}
+.brand .sub{font-size:11px;color:var(--soft);letter-spacing:.08em}
+.crumbs{display:flex;gap:6px;align-items:center;margin-top:8px;font-size:12px;color:var(--soft);min-height:18px}
+.crumbs b{color:var(--stem-dk);font-weight:700}
+/* step labels */
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--soft);font-weight:700;margin:18px 0 8px;text-transform:none;display:flex;align-items:center;gap:8px}
+.eyebrow .n{display:inline-grid;place-items:center;width:18px;height:18px;border:1.5px solid var(--stem);color:var(--stem-dk);border-radius:50%;font-size:11px;font-weight:800}
+/* crop grid */
+.crops{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.crop{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border-radius:13px;padding:11px 6px;font-size:13.5px;font-weight:700;cursor:pointer;
+  transition:transform .08s, border-color .15s, background .15s;box-shadow:var(--shadow)}
+.crop:active{transform:scale(.97)}
+.crop[aria-pressed="true"]{background:var(--stem);border-color:var(--stem);color:#fff}
+.crop .cnt{display:block;font-size:10.5px;font-weight:600;color:var(--soft);margin-top:2px}
+.crop[aria-pressed="true"] .cnt{color:#D6E8D8}
+/* filter bar */
+.filter{display:none;margin-top:6px}
+.filter.show{display:block}
+.seg{display:flex;background:#E7EBE2;border-radius:11px;padding:3px;gap:3px}
+.seg button{flex:1;border:0;background:transparent;padding:9px 4px;border-radius:9px;font-size:13px;font-weight:700;color:var(--soft);cursor:pointer}
+.seg button[aria-pressed="true"]{background:#fff;color:var(--ink);box-shadow:var(--shadow)}
+.seg button.s[aria-pressed="true"]{color:var(--shoudoku)}
+.seg button.j[aria-pressed="true"]{color:var(--jokusou)}
+.search{margin-top:8px;position:relative}
+.search input{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 12px 11px 36px;font-size:15px;background:var(--card)}
+.search input:focus{outline:2px solid var(--stem);border-color:var(--stem)}
+.search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--soft)}
+.meta{display:flex;justify-content:space-between;align-items:center;margin:14px 2px 8px;font-size:12px;color:var(--soft)}
+.meta b{color:var(--ink)}
+/* cards */
+.list{display:flex;flex-direction:column;gap:9px}
+.pcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--shoudoku);
+  border-radius:13px;padding:12px 13px;box-shadow:var(--shadow);cursor:pointer;transition:transform .08s}
+.pcard.j{border-left-color:var(--jokusou)}
+.pcard:active{transform:scale(.99)}
+.pc-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.pc-name{font-size:15px;font-weight:800;letter-spacing:.01em}
+.pc-form{font-size:11px;color:var(--soft);font-weight:600}
+.badge{font-size:10px;font-weight:800;padding:3px 7px;border-radius:999px;white-space:nowrap;letter-spacing:.02em}
+.badge.direct{background:#E4F0E6;color:var(--stem-dk)}
+.badge.group{background:#FBF3DC;color:var(--warn)}
+.pc-target{margin-top:5px;font-size:13px;color:var(--ink)}
+.pc-row{margin-top:7px;display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11.5px;background:#F0F3EC;border-radius:7px;padding:3px 8px;color:var(--stem-dk);font-weight:700}
+.chip.dose{background:#E6F0F1;color:var(--shoudoku)}
+.pcard.j .chip.dose{background:#F6ECE0;color:var(--jokusou)}
+.empty{text-align:center;color:var(--soft);padding:40px 10px;font-size:14px}
+/* sheet */
+.scrim{position:fixed;inset:0;background:rgba(24,35,26,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--paper);
+  border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
+  transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.2)}
+.sheet.show{transform:translateY(0)}
+.grab{width:38px;height:4px;background:var(--line);border-radius:99px;margin:9px auto 2px}
+.sheet-in{padding:6px 16px 26px}
+.sh-name{font-size:20px;font-weight:800;margin:6px 0 2px}
+.sh-sub{font-size:12.5px;color:var(--soft)}
+.sh-target{margin-top:10px;font-size:14px;background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 12px}
+.sh-target span{color:var(--soft);font-size:11px;display:block;margin-bottom:2px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.kv div{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:9px 11px;font-size:14px;font-weight:700}
+.kv span{display:block;color:var(--soft);font-size:11px;font-weight:600;margin-bottom:1px}
+/* calc */
+.calc{margin-top:16px;background:var(--stem-dk);color:#fff;border-radius:15px;padding:15px 15px 16px}
+.calc h3{margin:0 0 10px;font-size:13px;letter-spacing:.12em;font-weight:700;color:#CDE6D2}
+.calc .ratio{font-size:12px;color:#CDE6D2;margin-bottom:8px}
+.tankrow{display:flex;align-items:center;gap:9px}
+.tankrow label{font-size:13px;color:#CDE6D2;white-space:nowrap}
+.tankrow input{flex:1;font-size:18px;font-weight:800;border:0;border-radius:10px;padding:10px 12px;text-align:right;font-variant-numeric:tabular-nums}
+.tankrow .u{font-size:14px;color:#CDE6D2}
+.result{margin-top:13px;text-align:center}
+.result .big{font-size:38px;font-weight:800;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.result .big .un{font-size:16px;font-weight:700;margin-left:3px;color:#CDE6D2}
+.result .lbl{font-size:11px;color:#CDE6D2;letter-spacing:.1em;margin-bottom:5px}
+.result .note{font-size:11px;color:#A9CDB0;margin-top:6px}
+.nocalc{font-size:13px;color:#CDE6D2;text-align:center;padding:6px 0}
+/* record */
+.rec{margin-top:16px}
+.rec h3{font-size:13px;letter-spacing:.1em;color:var(--soft);margin:0 0 9px}
+.rec .field{margin-bottom:10px}
+.rec label{font-size:12px;color:var(--soft);font-weight:700;display:block;margin-bottom:4px}
+.rec select,.rec input{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px 12px;font-size:15px;background:var(--card)}
+.rec .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.save{width:100%;margin-top:6px;border:0;background:var(--stem);color:#fff;font-size:16px;font-weight:800;
+  padding:15px;border-radius:13px;cursor:pointer;letter-spacing:.04em}
+.save:active{background:var(--stem-dk)}
+.notice{margin-top:14px;background:var(--warn-bg);border:1px solid #EAD9A8;border-radius:11px;padding:10px 12px;font-size:12px;color:#6B4E00}
+.remain{margin:-2px 0 10px;font-size:12.5px;padding:9px 11px;border-radius:10px;background:#EEF3EA;color:var(--stem-dk);font-weight:700}
+.remain b{font-weight:800}
+.remain.warn{background:#FBF3DC;color:#7A5800}
+.remain.over{background:#FBE6E1;color:#9B2D1F}
+.remain.over u{text-decoration:none;font-weight:800}
+.remain.off{background:#EFEFEC;color:var(--soft);font-weight:600}
+.notice b{font-weight:800}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);z-index:60;
+  background:var(--ink);color:#fff;padding:12px 18px;border-radius:12px;font-size:13.5px;font-weight:700;
+  opacity:0;transition:all .25s;max-width:90vw;box-shadow:var(--shadow)}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.demoflag{font-size:10.5px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:1px 6px;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <span class="leaf">🌱</span>
+      <h1>農薬管理</h1>
+      <span class="sub">農・みのり</span>
+      <span id="demoFlag" class="demoflag" style="margin-left:auto">プレビュー版</span>
+    </div>
+    <div class="crumbs" id="crumbs">品目を選んでください</div>
+  </header>
+
+  <div class="eyebrow"><span class="n">1</span>品目を選ぶ</div>
+  <div class="crops" id="crops"></div>
+
+  <div class="filter" id="filter">
+    <div class="eyebrow"><span class="n">2</span>用途でしぼる</div>
+    <div class="seg" id="seg">
+      <button data-k="all" aria-pressed="true">すべて</button>
+      <button class="s" data-k="消毒" aria-pressed="false">消毒</button>
+      <button class="j" data-k="除草" aria-pressed="false">除草</button>
+    </div>
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" placeholder="病害虫名・農薬名でしぼり込み" inputmode="search">
+    </div>
+    <div class="meta"><span><b id="cnt">0</b> 件の登録</span><span id="src"></span></div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div class="sheet-in" id="sheetIn"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============== 設定（デプロイ時に書き換え） ============== */
+const CONFIG = {
+  // GitHub Pages 上の品目別JSONの場所（末尾スラッシュ込み）
+  DATA_BASE: "https://t244t.github.io/nouyaku-app/data/",
+  // 散布記録を書き込むGASのURL（健康管理アプリと同じGET方式）
+  GAS_URL:   "", // 例: https://script.google.com/macros/s/XXXX/exec
+  // 農薬アプリ用に新規作成するLIFF ID
+  LIFF_ID:   "", // 例: 2010xxxxxx-xxxxxxxx
+  LINE_USER: "Uf760e5551fafc369a0a2527dc30cf563" // LINE外プレビュー時の仮ID
+};
+/* 圃場（記憶済みの7か所） */
+const FIELDS = ["ねぎ前上","ねぎ前下","ねぎ横畑","ねぎ横畑先","みかん山","羽根戸田んぼ","西貝塚畑"];
+/* 18品目（slugはJSONファイル名） */
+const CROPS = [
+ ["お米","kome"],["なす","nasu"],["きゅうり","kyuri"],["キャベツ","kyabetsu"],
+ ["じゃがいも","jagaimo"],["スナップ\nエンドウ","endou"],["さつまいも","satsumaimo"],["オクラ","okura"],
+ ["トウモロコシ","corn"],["ピーマン","piman"],["トマト","tomato"],["落花生","rakkasei"],
+ ["レタス","retasu"],["ししとう","shishito"],["ホウレン草","horenso"],["にんにく","ninniku"],
+ ["人参","ninjin"],["玉ねぎ","tamanegi"]
+];
+/* プレビュー用 埋め込み実データ（なす・オクラ／FAMIC登録情報より一部抜粋） */
+const SAMPLE = {"nasu": {"品目": "なすび(なす)", "更新": "2026-06-10", "件数": 2023, "農薬": [{"名": "GFベンレート水和剤", "剤": "水和剤", "成": "ベノミル", "区": "消毒", "虫": "半身萎凋病", "希": "500倍", "液": "200~300mL/株", "期": "定植後~収穫14日前まで", "回": "3回以内", "法": "土壌灌注", "登": "直接", "作": "なす", "番": "23180"}, {"名": "GFワイドヒッター顆粒水和剤", "剤": "水和剤", "成": "TPN+ベンチアバリカルブイソプロピル", "区": "消毒", "虫": "褐色腐敗病", "希": "1000倍", "液": "100~300mL/m2", "期": "収穫前日まで", "回": "4回以内", "法": "散布", "登": "直接", "作": "なす", "番": "23976"}, {"名": "ICボルドー66D", "剤": "水和剤", "成": "塩基性硫酸銅", "区": "消毒", "虫": "軟腐病", "希": "100倍", "液": "100~300リットル/10a", "期": "発病前~発病初期", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類", "番": "18645"}, {"名": "ISKテルスターフロアブル", "剤": "水和剤", "成": "ビフェントリン", "区": "消毒", "虫": "アブラムシ類", "希": "4000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "23430"}, {"名": "ISKテルスター水和剤", "剤": "水和剤", "成": "ビフェントリン", "区": "消毒", "虫": "アブラムシ類", "希": "1000倍", "液": "150~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "23431"}, {"名": "JCジーファイン水和剤", "剤": "水和剤", "成": "炭酸水素ナトリウム+無水硫酸銅", "区": "消毒", "虫": "うどんこ病", "希": "20倍", "液": "10リットル/10a", "期": "収穫前日まで", "回": "-", "法": "常温煙霧", "登": "直接", "作": "なす", "番": "18533"}, {"名": "MICアディオン乳剤", "剤": "乳剤", "成": "ペルメトリン", "区": "消毒", "虫": "アブラムシ類", "希": "2000~3000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "22431"}, {"名": "MICコサイド3000", "剤": "水和剤", "成": "水酸化第二銅", "区": "消毒", "虫": "軟腐病", "希": "2000倍", "液": "100~300リットル/10a", "期": "-", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類", "番": "22535"}, {"名": "MICトルネードエースDF", "剤": "水和剤", "成": "インドキサカルブ", "区": "消毒", "虫": "ハスモンヨトウ", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "2回以内", "法": "散布", "登": "直接", "作": "なす", "番": "22767"}, {"名": "MICベルクート水和剤", "剤": "水和剤", "成": "イミノクタジンアルベシル酸塩", "区": "消毒", "虫": "すすかび病", "希": "3000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "22955"}, {"名": "OATイオウフロアブル", "剤": "その他", "成": "硫黄", "区": "消毒", "虫": "うどんこ病", "希": "500~1000倍", "液": "100~300リットル/10a", "期": "発病前~発病初期", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(すいか､かぼちゃ､ﾄﾏﾄ､ﾐﾆﾄﾏﾄ､ねぎ､わけぎ､あさつき､いちごを除く)", "番": "23642"}, {"名": "SDSドーシャスフロアブル", "剤": "水和剤", "成": "TPN+シアゾファミド", "区": "消毒", "虫": "褐色腐敗病", "希": "1000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "4回以内", "法": "散布", "登": "直接", "作": "なす", "番": "21185"}, {"名": "SDSフレンダーフロアブル", "剤": "水和剤", "成": "TPN+フルチアニル", "区": "消毒", "虫": "うどんこ病", "希": "1000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "2回以内", "法": "散布", "登": "直接", "作": "なす", "番": "23593"}, {"名": "SDSベジセイバー", "剤": "水和剤", "成": "TPN+ペンチオピラド", "区": "消毒", "虫": "うどんこ病", "希": "1000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "23647"}, {"名": "STサプロール乳剤", "剤": "乳剤", "成": "トリホリン", "区": "消毒", "虫": "うどんこ病", "希": "1000~2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "5回以内", "法": "散布", "登": "直接", "作": "なす", "番": "22136"}, {"名": "STゼンターリ顆粒水和剤", "剤": "水和剤", "成": "BT(生菌)", "区": "消毒", "虫": "アオムシ", "希": "1000~2000倍", "液": "100~300mL/m2", "期": "発生初期 但し、収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(ｷｬﾍﾞﾂ､はくさいを除く)", "番": "21734"}, {"名": "STダコニール1000", "剤": "水和剤", "成": "TPN", "区": "消毒", "虫": "うどんこ病", "希": "33倍", "液": "10リットル/10a", "期": "収穫前日まで", "回": "4回以内", "法": "常温煙霧", "登": "直接", "作": "なす", "番": "21759"}, {"名": "Zボルドー", "剤": "水和剤", "成": "塩基性硫酸銅", "区": "消毒", "虫": "すすかび病", "希": "500倍", "液": "100~300リットル/10a", "期": "発病前~発病初期", "回": "-", "法": "散布", "登": "直接", "作": "なす", "番": "24041"}, {"名": "なのはな乳剤", "剤": "乳剤", "成": "なたね油", "区": "消毒", "虫": "ハダニ類", "希": "300~500倍", "液": "150~500リットル/10a", "期": "収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(きゅうり､かぼちゃ､ｽﾞｯｷｰﾆを除く)", "番": "25022"}, {"名": "アイーナ20フロアブル", "剤": "水和剤", "成": "キノフメリン", "区": "消毒", "虫": "うどんこ病", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "24948"}, {"名": "アカリタッチ乳剤", "剤": "乳剤", "成": "プロピレングリコールモノ脂肪酸エステル", "区": "消毒", "虫": "ハダニ類", "希": "1000~3000倍", "液": "100~400リットル/10a", "期": "収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類", "番": "20609"}, {"名": "アクセルフロアブル", "剤": "水和剤", "成": "メタフルミゾン", "区": "消毒", "虫": "オオタバコガ", "希": "1000~2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "なす", "番": "22461"}, {"名": "CBCグリホス液剤", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "通常散布50~100リットル/10a少量散布25~50リットル/10a", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "直接", "作": "なす", "番": "24109"}, {"名": "STトレファノサイド乳剤", "剤": "乳剤", "成": "トリフルラリン", "区": "除草", "虫": "一年生雑草(ツユクサ科、カヤツリグサ科、キク科、アブラナ科を除く)", "希": "200~300mL/10a", "液": "100リットル/10a", "期": "定植前(植穴掘前)", "回": "1回", "法": "全面土壌散布", "登": "直接", "作": "なす(露地栽培)", "番": "21692"}, {"名": "TAJ", "剤": "液剤", "成": "グルホシネート", "区": "除草", "虫": "一年生雑草", "希": "300~500mL/10a", "液": "100~150リットル/10a", "期": "収穫前日まで(雑草生育期定植前又は畦間処理)", "回": "3回以内", "法": "雑草茎葉散布", "登": "直接", "作": "なす", "番": "25016"}, {"名": "アース草消滅", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "50mL/m2(原液散布)", "液": "", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "直接", "作": "なす", "番": "24250"}, {"名": "エイトアップ液剤", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "100リットル/10a", "期": "耕起7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "直接", "作": "なす", "番": "18815"}, {"名": "カルナクス", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "通常散布50~100リットル/10a少量散布25~50リットル/10a", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "直接", "作": "なす", "番": "21941"}]}, "okura": {"品目": "オクラ", "更新": "2026-06-10", "件数": 784, "農薬": [{"名": "GFベンレート水和剤", "剤": "水和剤", "成": "ベノミル", "区": "消毒", "虫": "葉すす病", "希": "3000倍", "液": "100~300mL/m2", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "23180"}, {"名": "ICボルドー66D", "剤": "水和剤", "成": "塩基性硫酸銅", "区": "消毒", "虫": "軟腐病", "希": "100倍", "液": "100~300リットル/10a", "期": "発病前~発病初期", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類", "番": "18645"}, {"名": "JCジーファイン水和剤", "剤": "水和剤", "成": "炭酸水素ナトリウム+無水硫酸銅", "区": "消毒", "虫": "白さび病", "希": "1000倍", "液": "150~500リットル/10a", "期": "収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(なすを除く)", "番": "18533"}, {"名": "MICアディオン乳剤", "剤": "乳剤", "成": "ペルメトリン", "区": "消毒", "虫": "ハスモンヨトウ", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "22431"}, {"名": "MICコサイド3000", "剤": "水和剤", "成": "水酸化第二銅", "区": "消毒", "虫": "軟腐病", "希": "2000倍", "液": "100~300リットル/10a", "期": "-", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類", "番": "22535"}, {"名": "MICベネビアOD", "剤": "水和剤", "成": "シアントラニリプロール", "区": "消毒", "虫": "アブラムシ類", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫開始3日前まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "23752"}, {"名": "OATイオウフロアブル", "剤": "その他", "成": "硫黄", "区": "消毒", "虫": "うどんこ病", "希": "500~1000倍", "液": "100~300リットル/10a", "期": "発病前~発病初期", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(すいか､かぼちゃ､ﾄﾏﾄ､ﾐﾆﾄﾏﾄ､ねぎ､わけぎ､あさつき､いちごを除く)", "番": "23642"}, {"名": "STゼンターリ顆粒水和剤", "剤": "水和剤", "成": "BT(生菌)", "区": "消毒", "虫": "アオムシ", "希": "1000~2000倍", "液": "100~300mL/m2", "期": "発生初期 但し、収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(ｷｬﾍﾞﾂ､はくさいを除く)", "番": "21734"}, {"名": "STダコニール1000", "剤": "水和剤", "成": "TPN", "区": "消毒", "虫": "葉すす病", "希": "1000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "5回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "21759"}, {"名": "Zボルドー", "剤": "水和剤", "成": "塩基性硫酸銅", "区": "消毒", "虫": "斑点細菌病", "希": "500倍", "液": "100~300リットル/10a", "期": "発病前~発病初期", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(ｷｬﾍﾞﾂを除く)", "番": "24041"}, {"名": "「興農」ジェネレート水溶剤", "剤": "水溶剤", "成": "アセフェート", "区": "消毒", "虫": "アブラムシ類", "希": "1000倍", "液": "100~300リットル/10a", "期": "収穫開始7日前まで", "回": "1回", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "20968"}, {"名": "なのはな乳剤", "剤": "乳剤", "成": "なたね油", "区": "消毒", "虫": "ハダニ類", "希": "300~500倍", "液": "150~500リットル/10a", "期": "収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(きゅうり､かぼちゃ､ｽﾞｯｷｰﾆを除く)", "番": "25022"}, {"名": "アカリタッチ乳剤", "剤": "乳剤", "成": "プロピレングリコールモノ脂肪酸エステル", "区": "消毒", "虫": "ハダニ類", "希": "1000~3000倍", "液": "100~400リットル/10a", "期": "収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類", "番": "20609"}, {"名": "アクタラ顆粒水溶剤", "剤": "水溶剤", "成": "チアメトキサム", "区": "消毒", "虫": "アブラムシ類", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "20672"}, {"名": "アグロケア水和剤", "剤": "水和剤", "成": "バチルス ズブチリスHAI-0404", "区": "消毒", "虫": "灰色かび病", "希": "1000倍", "液": "10リットル/10a", "期": "収穫前日まで", "回": "-", "法": "常温煙霧", "登": "グループ", "作": "野菜類", "番": "22516"}, {"名": "アディオン乳剤", "剤": "乳剤", "成": "ペルメトリン", "区": "消毒", "虫": "ハスモンヨトウ", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "15957"}, {"名": "アドマイヤーフロアブル", "剤": "水和剤", "成": "イミダクロプリド", "区": "消毒", "虫": "アブラムシ類", "希": "4000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ(施設栽培)", "番": "18562"}, {"名": "アファーム乳剤", "剤": "乳剤", "成": "エマメクチン安息香酸塩", "区": "消毒", "虫": "オオタバコガ", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "2回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "19842"}, {"名": "アフェットフロアブル", "剤": "水和剤", "成": "ペンチオピラド", "区": "消毒", "虫": "灰色かび病", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "3回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "22209"}, {"名": "アミスター20フロアブル", "剤": "水和剤", "成": "アゾキシストロビン", "区": "消毒", "虫": "うどんこ病", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "2回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "20574"}, {"名": "アルバリン顆粒水溶剤", "剤": "水溶剤", "成": "ジノテフラン", "区": "消毒", "虫": "アブラムシ類", "希": "2000倍", "液": "100~300リットル/10a", "期": "収穫前日まで", "回": "2回以内", "法": "散布", "登": "直接", "作": "ｵｸﾗ", "番": "20812"}, {"名": "アーリーセーフ", "剤": "乳剤", "成": "脂肪酸グリセリド(虫)", "区": "消毒", "虫": "アブラムシ類", "希": "300倍", "液": "150~500リットル/10a", "期": "収穫前日まで", "回": "-", "法": "散布", "登": "グループ", "作": "野菜類(なす､ﾄﾏﾄ､ﾐﾆﾄﾏﾄ､しゅんぎくを除く)", "番": "21767"}, {"名": "CBCグリホス液剤", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "通常散布50~100リットル/10a少量散布25~50リットル/10a", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "グループ", "作": "野菜類(えだまめ､ｷｬﾍﾞﾂ､はつかだいこん､だいこん､とうがらし類､にんじん､ﾋﾟｰﾏﾝ､ねぎ､たまねぎ､ｱｽﾊﾟﾗｶﾞｽ､ｵﾘｰﾌﾞ(葉)､きゅうり､しゃくやく(薬用)､たらのき､ﾄﾏﾄ､なす､びわ(葉)､ほうれんそう､ﾚﾀｽ､薬用にんじんを除く)", "番": "24109"}, {"名": "アース草消滅", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "50mL/m2(原液散布)", "液": "", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "グループ", "作": "野菜類(えだまめ､ｷｬﾍﾞﾂ､はつかだいこん､だいこん､とうがらし類､にんじん､ﾋﾟｰﾏﾝ､ねぎ､たまねぎ､ｱｽﾊﾟﾗｶﾞｽ､ｵﾘｰﾌﾞ(葉)､きゅうり､しゃくやく(薬用)､たらのき､ﾄﾏﾄ､なす､びわ(葉)､ほうれんそう､ﾚﾀｽ､薬用にんじんを除く)", "番": "24250"}, {"名": "エイトアップ液剤", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "100リットル/10a", "期": "耕起7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "グループ", "作": "野菜類(だいこん､えだまめ､豆類(種実､ただし､らっかせいを除く)､いも類､ねぎ､たまねぎ､ﾄﾏﾄ､きゅうり､なす､ｱｽﾊﾟﾗｶﾞｽ､ｵﾘｰﾌﾞ(葉)､たらのき､びわ(葉)､ほうれんそう､ﾚﾀｽ､とうがらし類､にんじん､ﾋﾟｰﾏﾝ､薬用にんじんを除く)", "番": "18815"}, {"名": "カルナクス", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "通常散布50~100リットル/10a少量散布25~50リットル/10a", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "グループ", "作": "野菜類(えだまめ､ｷｬﾍﾞﾂ､はつかだいこん､だいこん､とうがらし類､にんじん､ﾋﾟｰﾏﾝ､ねぎ､たまねぎ､ｱｽﾊﾟﾗｶﾞｽ､ｵﾘｰﾌﾞ(葉)､きゅうり､しゃくやく(薬用)､たらのき､ﾄﾏﾄ､なす､びわ(葉)､ほうれんそう､ﾚﾀｽ､薬用にんじんを除く)", "番": "21941"}, {"名": "カレター", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "通常散布50~100リットル/10a 少量散布25~50リットル/10a、5~15リットル/10a", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "グループ", "作": "野菜類(えだまめ､ｷｬﾍﾞﾂ､はつかだいこん､だいこん､とうがらし類､にんじん､ﾋﾟｰﾏﾝ､ねぎ､たまねぎ､ｱｽﾊﾟﾗｶﾞｽ､ｵﾘｰﾌﾞ(葉)､きゅうり､たらのき､ﾄﾏﾄ､なす､びわ(葉)､ほうれんそう､ﾚﾀｽ､薬用にんじん､豆類(種実､ただし､らっかせいを除く)､かんしょを除く)", "番": "24358"}, {"名": "キャピタルグリホサート41%", "剤": "液剤", "成": "グリホサートイソプロピルアミン塩", "区": "除草", "虫": "一年生雑草", "希": "250~500mL/10a", "液": "通常散布50~100リットル/10a 少量散布25~50リットル/10a、5~15リットル/10a", "期": "耕起又は定植7日前まで(雑草生育期)", "回": "1回", "法": "雑草茎葉散布", "登": "グループ", "作": "野菜類(えだまめ､ｷｬﾍﾞﾂ､はつかだいこん､だいこん､とうがらし類､にんじん､ﾋﾟｰﾏﾝ､ねぎ､たまねぎ､ｱｽﾊﾟﾗｶﾞｽ､ｵﾘｰﾌﾞ(葉)､きゅうり､たらのき､ﾄﾏﾄ､なす､びわ(葉)､ほうれんそう､ﾚﾀｽ､薬用にんじん､豆類(種実､ただし､らっかせいを除く)､かんしょを除く)", "番": "21241"}]}};
+
+let state = {crop:null, slug:null, data:null, filter:"all", q:"", current:null};
+
+/* ---- LIFF初期化（LINE内ならユーザーIDを自動取得） ---- */
+async function initLiff(){
+  if(!CONFIG.LIFF_ID || typeof liff==='undefined') return;
+  try{
+    await liff.init({liffId: CONFIG.LIFF_ID});
+    if(liff.isLoggedIn()){
+      const p = await liff.getProfile();
+      if(p && p.userId) CONFIG.LINE_USER = p.userId;
+      const f=document.getElementById('demoFlag'); if(f) f.style.display='none';
+    }
+  }catch(e){ /* LINE外・未設定時はプレビューとして動作 */ }
+}
+initLiff();
+
+/* ---- 品目ボタン ---- */
+const cropsEl = document.getElementById('crops');
+CROPS.forEach(([name,slug])=>{
+  const b=document.createElement('button');
+  b.className='crop'; b.type='button'; b.setAttribute('aria-pressed','false');
+  b.innerHTML = name.replace('\n','<br>');
+  b.onclick=()=>selectCrop(name.replace('\n',''),slug,b);
+  cropsEl.appendChild(b);
+});
+
+async function selectCrop(name,slug,btn){
+  document.querySelectorAll('.crop').forEach(c=>c.setAttribute('aria-pressed','false'));
+  btn.setAttribute('aria-pressed','true');
+  state.crop=name; state.slug=slug; state.q=''; document.getElementById('q').value='';
+  document.getElementById('crumbs').innerHTML = `<b>${name}</b> の登録農薬`;
+  document.getElementById('filter').classList.add('show');
+  document.getElementById('list').innerHTML = '<div class="empty">読み込み中…</div>';
+  // 1) 埋め込みサンプル 2) GitHub Pages の JSON
+  let d = SAMPLE[slug] || null, src='';
+  if(d){ src='プレビュー用サンプル'; }
+  else {
+    try{
+      const r = await fetch(CONFIG.DATA_BASE+slug+'.json');
+      if(!r.ok) throw 0;
+      d = await r.json(); src='FAMIC登録情報 '+(d.更新||'');
+    }catch(e){
+      document.getElementById('list').innerHTML =
+        `<div class="empty">この品目のデータはデプロイ後に表示されます。<br><small>(${CONFIG.DATA_BASE}${slug}.json を配置)</small></div>`;
+      document.getElementById('cnt').textContent='0'; return;
+    }
+  }
+  state.data=d; document.getElementById('src').textContent=src;
+  render();
+  document.getElementById('filter').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ---- 絞り込み ---- */
+document.getElementById('seg').onclick=(e)=>{
+  const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#seg button').forEach(x=>x.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true'); state.filter=b.dataset.k; render();
+};
+document.getElementById('q').oninput=(e)=>{ state.q=e.target.value.trim(); render(); };
+
+function render(){
+  if(!state.data) return;
+  let rows=state.data.農薬.slice();
+  if(state.filter!=='all') rows=rows.filter(r=>r.区===state.filter);
+  if(state.q){ const q=state.q.toLowerCase();
+    rows=rows.filter(r=>(r.名+r.虫+r.成).toLowerCase().includes(q)); }
+  document.getElementById('cnt').textContent=rows.length;
+  const list=document.getElementById('list');
+  if(!rows.length){ list.innerHTML='<div class="empty">該当する登録がありません</div>'; return; }
+  list.innerHTML='';
+  rows.slice(0,300).forEach(r=>{
+    const c=document.createElement('div');
+    c.className='pcard'+(r.区==='除草'?' j':'');
+    c.innerHTML=`
+      <div class="pc-top">
+        <div><div class="pc-name">${esc(r.名)}</div><div class="pc-form">${esc(r.剤)}・${esc(r.成)}</div></div>
+        <div class="badge ${r.登==='直接'?'direct':'group'}">${r.登==='直接'?'品目登録':'群登録'}</div>
+      </div>
+      <div class="pc-target">${esc(r.虫)}</div>
+      <div class="pc-row">
+        <span class="chip dose">${esc(r.希||'—')}</span>
+        <span class="chip">${esc(r.期||'時期—')}</span>
+        <span class="chip">${esc(r.回||'回数—')}</span>
+      </div>`;
+    c.onclick=()=>openSheet(r);
+    list.appendChild(c);
+  });
+  if(rows.length>300){ const m=document.createElement('div'); m.className='empty';
+    m.textContent=`ほか ${rows.length-300} 件（しぼり込んでください）`; list.appendChild(m); }
+}
+
+/* ---- 希釈の倍率を抽出 ---- */
+function parseBai(s){
+  s=(s||'').replace(/,/g,'');
+  let m=s.match(/(\d+(?:\.\d+)?)\s*[~〜]\s*(\d+(?:\.\d+)?)\s*倍/);
+  if(m) return {type:'range',a:+m[1],b:+m[2]};
+  m=s.match(/(\d+(?:\.\d+)?)\s*倍/);
+  if(m) return {type:'single',a:+m[1]};
+  return null;
+}
+function doseText(tankL,bai){
+  // 薬量(mL) = タンク容量(L) × 1000 / 倍率
+  const f=v=>{ const mL=tankL*1000/v; return mL>=1000?(mL/1000).toFixed(mL/1000>=10?0:2)+'L':mL.toFixed(mL>=100?0:1)+'mL'; };
+  if(bai.type==='single') return {val:f(bai.a),sub:`${tankL}L ÷ ${bai.a}倍`};
+  return {val:f(bai.b)+'〜'+f(bai.a),sub:`${bai.b}〜${bai.a}倍で希釈`};
+}
+/* 「3回以内」→3 などラベル上限を抽出 */
+function parseKaisu(s){ const m=String(s||'').match(/(\d+)\s*回/); return m?+m[1]:null; }
+
+/* 残使用回数：圃場が決まったら今期の使用済み回数をGASから取得 */
+async function updateRemaining(){
+  const el=document.getElementById('remain'); if(!el) return;
+  const r=state.current, max=parseKaisu(r.回);
+  const field=document.getElementById('field').value;
+  if(!CONFIG.GAS_URL){ el.className='remain off';
+    el.innerHTML='残回数の自動集計はGAS接続後に表示されます'; return; }
+  el.className='remain'; el.textContent='今期の使用回数を確認中…';
+  try{
+    const u=CONFIG.GAS_URL+'?action=remaining&'+new URLSearchParams(
+      {品目:state.crop,圃場:field,農薬名:r.名}).toString();
+    const res=await(await fetch(u)).json();
+    const used=res.used||0;
+    if(max==null){ el.className='remain'; el.innerHTML=`<b>${field}</b>：今期 使用${used}回（上限はラベルで確認）`; return; }
+    const left=max-used;
+    el.className='remain'+(left<=0?' over':left===1?' warn':'');
+    el.innerHTML=`<b>${field}</b>：今期 使用${used}回 / 上限${max}回　`+
+      (left<=0?`<u>残り0回・上限到達</u>`:`残り${left}回`);
+  }catch(e){ el.className='remain off'; el.textContent='使用回数を取得できませんでした'; }
+}
+
+/* ---- 詳細＋計算＋記録シート ---- */
+function openSheet(r){
+  state.current=r;
+  const bai=parseBai(r.希);
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('sheetIn').innerHTML=`
+    <div class="sh-name">${esc(r.名)}</div>
+    <div class="sh-sub">${esc(r.剤)}・${esc(r.成)}　/　${r.区==='除草'?'除草':'消毒'}　登録番号 ${esc(r.番)}</div>
+    <div class="sh-target"><span>適用（対象）</span>${esc(r.虫)}</div>
+    <div class="kv">
+      <div><span>希釈倍数・使用量</span>${esc(r.希||'—')}</div>
+      <div><span>使用時期</span>${esc(r.期||'—')}</div>
+      <div><span>本剤の使用回数</span>${esc(r.回||'—')}</div>
+      <div><span>使用方法</span>${esc(r.法||'—')}</div>
+    </div>
+
+    <div class="calc">
+      <h3>希釈計算</h3>
+      ${bai ? `
+      <div class="ratio">登録：${esc(r.希)}</div>
+      <div class="tankrow">
+        <label>タンク容量</label>
+        <input id="tank" type="number" inputmode="decimal" value="20" min="1" step="1">
+        <span class="u">L</span>
+      </div>
+      <div class="result">
+        <div class="lbl">必要な薬量</div>
+        <div class="big" id="dose"></div>
+        <div class="note" id="dosesub"></div>
+      </div>` : `<div class="nocalc">この登録は倍率希釈ではありません（${esc(r.希||'使用量指定')}）。<br>使用量はラベルでご確認ください。</div>`}
+    </div>
+
+    <div class="rec">
+      <h3>散布を記録</h3>
+      <div class="field"><label>圃場</label>
+        <select id="field">${FIELDS.map(f=>`<option>${f}</option>`).join('')}</select></div>
+      <div class="remain off" id="remain"></div>
+      <div class="two">
+        <div class="field"><label>散布日</label><input id="date" type="date" value="${today}"></div>
+        <div class="field"><label>使用量</label><input id="amt" placeholder="例：5mL / 1袋"></div>
+      </div>
+      <div class="field"><label>メモ（任意）</label><input id="memo" placeholder="天候・対象の状況など"></div>
+      <button class="save" id="saveBtn">この内容で記録する</button>
+      <div class="notice"><b>確認：</b>実際の使用前に、必ず製品ラベルで適用作物・希釈・使用回数・収穫前日数をご確認ください（FAMIC登録情報より）。</div>
+    </div>`;
+  // 計算ライブ更新
+  if(bai){
+    const upd=()=>{ const t=parseFloat(document.getElementById('tank').value)||0;
+      if(t<=0){document.getElementById('dose').textContent='—';document.getElementById('dosesub').textContent='';return;}
+      const d=doseText(t,bai); document.getElementById('dose').innerHTML=d.val.replace(/(mL|L)/g,'<span class="un">$1</span>');
+      document.getElementById('dosesub').textContent=d.sub; };
+    document.getElementById('tank').oninput=upd; upd();
+  }
+  document.getElementById('saveBtn').onclick=saveRecord;
+  document.getElementById('field').onchange=updateRemaining;
+  updateRemaining();
+  document.getElementById('scrim').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+function closeSheet(){ document.getElementById('scrim').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show'); }
+document.getElementById('scrim').onclick=closeSheet;
+
+function saveRecord(){
+  const r=state.current;
+  const rec={
+    line_user:CONFIG.LINE_USER, 品目:state.crop, 農薬名:r.名, 区分:r.区,
+    対象:r.虫, 圃場:document.getElementById('field').value,
+    散布日:document.getElementById('date').value, 使用量:document.getElementById('amt').value,
+    希釈:r.希, 登録番号:r.番, メモ:document.getElementById('memo').value
+  };
+  if(!CONFIG.GAS_URL){
+    closeSheet();
+    toast('記録内容を確認しました（GAS未接続のため保存はされていません）');
+    console.log('記録プレビュー →', rec);
+    return;
+  }
+  // 本番：GASへGETで送信（健康管理アプリと同じCORS回避方式）
+  const url=CONFIG.GAS_URL+'?action=addSpray&'+new URLSearchParams(rec).toString();
+  fetch(url).then(r=>r.json()).then(()=>{closeSheet();toast('記録しました');})
+    .catch(()=>toast('保存に失敗しました。通信を確認してください'));
+}
+
+let tg; function toast(msg){ const t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show'); clearTimeout(tg);
+  tg=setTimeout(()=>t.classList.remove('show'),2600); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+</script>
+</body>
+</html>
