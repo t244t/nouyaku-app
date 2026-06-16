@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>農・みのり 圃場マップ</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --shoudoku:#1E6F7A; --jokusou:#B5651D;
+  --warn:#9A6B00; --warn-bg:#FBF3DC; --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.10);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  color:var(--ink);background:var(--paper);font-feature-settings:"palt";-webkit-font-smoothing:antialiased;overflow:hidden}
+#map{position:absolute;inset:0;background:#2b3a2b}
+/* 衛星写真はリアルに見せたいので彩度は触らず、わずかにコントラストだけ整える */
+.leaflet-tile{filter:contrast(1.04) saturate(1.02)}
+.leaflet-container{background:#2b3a2b}
+
+/* ヘッダー（地図に浮かせる） */
+.top{position:absolute;z-index:1000;top:0;left:0;right:0;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px 12px;
+  background:linear-gradient(to bottom, rgba(18,26,18,.78), rgba(18,26,18,0));
+  pointer-events:none}
+.top .row{display:flex;align-items:baseline;gap:8px;color:#fff}
+.top h1{margin:0;font-size:17px;font-weight:800;letter-spacing:.04em;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.top .sub{font-size:11px;color:#D6E0D2;letter-spacing:.08em}
+.legend{margin-top:9px;display:inline-flex;gap:6px;pointer-events:auto}
+.legend .lg{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);
+  border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;box-shadow:var(--shadow)}
+.legend .dot{width:11px;height:11px;border-radius:3px}
+.dot.done{background:var(--stem)} .dot.todo{background:var(--jokusou)}
+.legend .done-t{color:var(--stem-dk)} .legend .todo-t{color:var(--jokusou)}
+
+/* 圃場ラベル */
+.fld-label{background:rgba(18,26,18,.62);color:#fff;font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:7px;border:0;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.fld-label::before{display:none}
+
+/* 現在地ボタン */
+.locate{position:absolute;z-index:1000;right:14px;bottom:calc(env(safe-area-inset-bottom) + 18px);
+  width:46px;height:46px;border-radius:14px;border:0;background:var(--card);box-shadow:var(--shadow);
+  display:grid;place-items:center;cursor:pointer}
+.locate svg{color:var(--stem-dk)}
+.locate:active{transform:scale(.95)}
+
+/* 下からせり上がるシート（農薬アプリと統一） */
+.scrim{position:fixed;inset:0;background:rgba(24,35,26,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+.scrim.show{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);
+  border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
+  transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:84vh;overflow:auto;
+  box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+.sheet.show{transform:translateY(0)}
+.grab{width:38px;height:4px;background:var(--line);border-radius:99px;margin:9px auto 2px}
+.sheet-in{padding:6px 16px 22px}
+.sh-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 2px}
+.sh-name{font-size:21px;font-weight:800}
+.status{font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;white-space:nowrap}
+.status.done{background:#E4F0E6;color:var(--stem-dk)}
+.status.todo{background:var(--warn-bg);color:var(--jokusou)}
+.sh-grp{font-size:12px;color:var(--soft)}
+.weed{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
+.weed .t{font-size:11px;letter-spacing:.1em;color:var(--soft);font-weight:700}
+.weed .v{font-size:15px;font-weight:800;margin-top:3px}
+.weed .v small{font-weight:600;color:var(--soft);font-size:12px}
+.kv{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.kv div{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:10px 12px}
+.kv span{display:block;color:var(--soft);font-size:11px;font-weight:700;margin-bottom:3px}
+.kv b{font-size:15px;font-weight:800}
+.kv b.empty{color:#AEB8AA;font-weight:700}
+.recent{margin-top:12px}
+.recent .t{font-size:11px;letter-spacing:.1em;color:var(--soft);font-weight:700;margin-bottom:6px}
+.rec-row{display:flex;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);
+  border-radius:11px;padding:9px 12px;margin-bottom:6px;font-size:13px}
+.rec-row .nm{font-weight:700}
+.rec-row .nm .b{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;margin-right:6px;vertical-align:1px}
+.b.s{background:#E6F0F1;color:var(--shoudoku)} .b.j{background:#F6ECE0;color:var(--jokusou)}
+.rec-row .dt{color:var(--soft);white-space:nowrap}
+.note{margin-top:13px;background:var(--warn-bg);border:1px solid #EAD9A8;border-radius:11px;padding:10px 12px;font-size:12px;color:#6B4E00}
+.empty-state{color:var(--soft);font-size:13px;text-align:center;padding:12px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top">
+  <div class="row"><h1>圃場マップ</h1><span class="sub">農・みのり</span></div>
+  <div class="legend">
+    <span class="lg"><span class="dot done"></span><span class="done-t">除草済み</span></span>
+    <span class="lg"><span class="dot todo"></span><span class="todo-t">未処理</span></span>
+  </div>
+</div>
+
+<button class="locate" id="locate" title="現在地">
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+</button>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"><div class="grab"></div><div class="sheet-in" id="sheetIn"></div></div>
+
+<script>
+const CONFIG = {
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec",
+  LIFF_ID: "",                 // 農薬アプリと同じLIFF IDを入れてもOK
+  FIELDS_CANDIDATES: ["./fields.json","./data/fields.json"], // ルート・dataフォルダの両方を自動で探す
+  WEED_WINDOW_DAYS: 30         // この日数以内に除草記録があれば「除草済み」
+};
+
+/* LIFF（任意） */
+(async()=>{ if(CONFIG.LIFF_ID && typeof liff!=='undefined'){ try{ await liff.init({liffId:CONFIG.LIFF_ID}); }catch(e){} } })();
+
+/* 地図：Esri衛星写真（キー不要） */
+const map = L.map('map',{zoomControl:false, attributionControl:true}).setView([33.5563,130.1972],16);
+L.control.zoom({position:'bottomleft'}).addTo(map);
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{
+  maxZoom:19, attribution:'衛星写真 © Esri, Maxar, Earthstar Geographics'
+}).addTo(map);
+
+let RECORDS = [];     // 散布記録（GASから）
+let STATUS = {};      // 圃場名 -> {done, lastWeed, lastSpray, weedCount}
+let layerByName = {};
+
+/* 日付パース（YYYY-MM-DD / Date文字列） */
+function pd(s){ const m=String(s||'').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  return m? new Date(+m[1],+m[2]-1,+m[3]) : null; }
+function daysAgo(d){ return Math.floor((Date.now()-d.getTime())/86400000); }
+function fmt(d){ return d? `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}` : '—'; }
+
+/* GASから記録を取得して圃場ごとに集計 */
+async function loadRecords(){
+  if(!CONFIG.GAS_URL) return;
+  try{
+    const r = await fetch(CONFIG.GAS_URL+'?action=listSpray');
+    const j = await r.json();
+    RECORDS = (j && j.records) ? j.records : [];
+  }catch(e){ RECORDS=[]; }
+  STATUS = {};
+  RECORDS.forEach(rec=>{
+    const f = String(rec['圃場']||''); if(!f) return;
+    const d = pd(rec['散布日']); const ku = String(rec['区分']||'');
+    if(!STATUS[f]) STATUS[f]={done:false,lastWeed:null,lastSpray:null,weedCount:0};
+    const s = STATUS[f];
+    if(d && (!s.lastSpray || d>s.lastSpray)) s.lastSpray=d;
+    if(ku.indexOf('除草')>=0){ s.weedCount++; if(d && (!s.lastWeed || d>s.lastWeed)) s.lastWeed=d; }
+  });
+  Object.values(STATUS).forEach(s=>{ s.done = s.lastWeed && daysAgo(s.lastWeed)<=CONFIG.WEED_WINDOW_DAYS; });
+}
+
+/* ポリゴンの塗り */
+function styleFor(name){
+  const done = STATUS[name] && STATUS[name].done;
+  const c = done ? getCss('--stem') : getCss('--jokusou');
+  return {color:c, weight:2.5, opacity:.95, fillColor:c, fillOpacity:.28};
+}
+function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+/* 圃場ポリゴン読み込み（複数の置き場所を自動で試す） */
+async function loadFields(){
+  let gj=null;
+  for(const url of CONFIG.FIELDS_CANDIDATES){
+    try{ const r=await fetch(url); if(r.ok){ gj=await r.json(); break; } }catch(e){}
+  }
+  if(!gj){
+    openSheetMsg('fields.json を読み込めませんでした。ルートか data フォルダに置いてください。');
+    return;
+  }
+
+  const layer = L.geoJSON(gj,{
+    style:f=>styleFor(f.properties.name),
+    onEachFeature:(f,lyr)=>{
+      const name=f.properties.name;
+      layerByName[name]=lyr;
+      lyr.on('click',()=>openField(f.properties));
+      // 中心にラベル
+      const c=lyr.getBounds().getCenter();
+      L.marker(c,{icon:L.divIcon({className:'',html:`<div class="fld-label">${name}</div>`,iconSize:[0,0]}),interactive:false}).addTo(map);
+    }
+  }).addTo(map);
+  try{ map.fitBounds(layer.getBounds().pad(0.25)); }catch(e){}
+}
+
+/* 詳細シート */
+function openField(p){
+  const name=p.name;
+  const s=STATUS[name]||{done:false,lastWeed:null,lastSpray:null,weedCount:0};
+  const recent = RECORDS.filter(r=>String(r['圃場'])===name)
+    .map(r=>({nm:r['農薬名'],ku:String(r['区分']||''),d:pd(r['散布日'])}))
+    .sort((a,b)=>(b.d?b.d:0)-(a.d?a.d:0)).slice(0,4);
+  const meta=(k)=>{ const v=(p[k]||'').toString().trim(); return v? `<b>${esc(v)}</b>` : `<b class="empty">未登録</b>`; };
+  const weedLine = s.lastWeed
+    ? `<div class="v">${fmt(s.lastWeed)} <small>（${daysAgo(s.lastWeed)}日前・通算${s.weedCount}回）</small></div>`
+    : `<div class="v"><span style="color:#AEB8AA">記録なし</span></div>`;
+
+  document.getElementById('sheetIn').innerHTML=`
+    <div class="sh-head">
+      <div><div class="sh-name">${esc(name)}</div><div class="sh-grp">${esc(p.group||'')}</div></div>
+      <span class="status ${s.done?'done':'todo'}">${s.done?'除草済み':'未処理'}</span>
+    </div>
+    <div class="weed"><div class="t">最終除草</div>${weedLine}</div>
+    <div class="kv">
+      <div><span>作付け品種</span>${meta('品種')}</div>
+      <div><span>播種・定植日</span>${meta('播種日')}</div>
+      <div><span>施肥履歴</span>${meta('施肥')}</div>
+      <div><span>収量</span>${meta('収量')}</div>
+    </div>
+    <div class="recent">
+      <div class="t">直近の散布</div>
+      ${recent.length? recent.map(r=>`
+        <div class="rec-row"><div class="nm"><span class="b ${r.ku.indexOf('除草')>=0?'j':'s'}">${r.ku.indexOf('除草')>=0?'除草':'消毒'}</span>${esc(r.nm||'—')}</div><div class="dt">${fmt(r.d)}</div></div>
+      `).join('') : '<div class="empty-state">この圃場の散布記録はまだありません。</div>'}
+    </div>
+    <div class="note">品種・播種日・施肥・収量は <b>fields.json</b> に書くとここに表示されます。除草済み／未処理は散布記録（区分＝除草・直近${CONFIG.WEED_WINDOW_DAYS}日）から自動判定しています。</div>`;
+  document.getElementById('scrim').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+  // 選択ハイライト
+  Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5}));
+  if(layerByName[name]) layerByName[name].setStyle({weight:5});
+}
+function closeSheet(){ document.getElementById('scrim').classList.remove('show');
+  document.getElementById('sheet').classList.remove('show');
+  Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5})); }
+document.getElementById('scrim').onclick=closeSheet;
+function openSheetMsg(msg){
+  document.getElementById('sheetIn').innerHTML=`<div class="empty-state">${esc(msg)}</div>`;
+  document.getElementById('scrim').classList.add('show');
+  document.getElementById('sheet').classList.add('show');
+}
+
+/* 現在地 */
+document.getElementById('locate').onclick=()=>{
+  map.locate({setView:true, maxZoom:17});
+};
+let meMarker;
+map.on('locationfound',e=>{
+  if(meMarker) map.removeLayer(meMarker);
+  meMarker=L.circleMarker(e.latlng,{radius:7,color:'#fff',weight:2,fillColor:'#1E6F7A',fillOpacity:1}).addTo(map);
+});
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+(async()=>{ await loadRecords(); await loadFields(); })();
+</script>
+</body>
+</html>
