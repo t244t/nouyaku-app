@@ -129,9 +129,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 
 /* 圃場マップを開くボタン（ヘッダー） */
 .mapbtn{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--stem-dk);
-  font-size:12px;font-weight:800;padding:6px 11px;border-radius:10px;cursor:pointer;display:inline-flex;
-  align-items:center;gap:5px;box-shadow:var(--shadow)}
+  font-size:12.5px;font-weight:800;padding:8px 12px;border-radius:10px;cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center;gap:5px;box-shadow:var(--shadow);flex:1}
 .mapbtn:active{transform:scale(.97)}
+.toolbar{display:flex;gap:8px;margin-top:10px}
 
 /* 地図ビュー（全画面オーバーレイ） */
 #mapView{position:fixed;inset:0;z-index:900;background:#2b3a2b;display:none}
@@ -189,8 +190,19 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   border-radius:11px;padding:9px 12px;margin-bottom:6px;font-size:13px}
 .frow .b{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;margin-right:6px}
 .frow .b.s{background:#E6F0F1;color:var(--shoudoku)}.frow .b.j{background:#F6ECE0;color:var(--jokusou)}
+.frow .b.w{background:#E4F0E6;color:var(--stem-dk)}
 .frow .dt{color:var(--soft);white-space:nowrap}
 .fempty{color:var(--soft);font-size:13px;text-align:center;padding:12px}
+
+/* 作業報告フォーム */
+.catgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px}
+.catbtn{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border-radius:12px;padding:12px 8px;font-size:13.5px;font-weight:700;cursor:pointer;text-align:center}
+.catbtn[aria-pressed="true"]{background:var(--stem);border-color:var(--stem);color:#fff}
+.subchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:9px}
+.subchip{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);
+  border-radius:999px;padding:8px 13px;font-size:13px;font-weight:700;cursor:pointer}
+.subchip[aria-pressed="true"]{background:var(--stem-dk);border-color:var(--stem-dk);color:#fff}
 </style>
 </head>
 <body>
@@ -200,11 +212,17 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       <span class="leaf">🌱</span>
       <h1>農薬管理</h1>
       <span class="sub">農・みのり</span>
-      <button class="mapbtn" id="openMap" style="margin-left:auto">
+      <span id="demoFlag" class="demoflag" style="margin-left:auto">プレビュー版</span>
+    </div>
+    <div class="toolbar">
+      <button class="mapbtn" id="openMap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>
         圃場マップ
       </button>
-      <span id="demoFlag" class="demoflag">プレビュー版</span>
+      <button class="mapbtn" id="openWork">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        作業報告
+      </button>
     </div>
     <div class="crumbs" id="crumbs">品目を選んでください</div>
   </header>
@@ -268,6 +286,13 @@ const CONFIG = {
 };
 /* 圃場（記憶済みの7か所） */
 const FIELDS = ["ねぎ前上","ねぎ前下","ねぎ横畑","ねぎ横畑先","みかん山","羽根戸田んぼ","西貝塚畑"];
+/* 作業報告のカテゴリーと内訳 */
+const WORK_CATEGORIES = {
+  "栽培管理": ["定植・播種","潅水","施肥","誘引","摘葉","整地"],
+  "除草":     ["除草（手作業）","除草（機械）"],
+  "収穫・出荷": ["収穫","出荷"],
+  "その他":   []
+};
 /* 18品目（slugはJSONファイル名） */
 const CROPS = [
  ["お米","kome"],["なす","nasu"],["きゅうり","kyuri"],["キャベツ","kyabetsu"],
@@ -508,7 +533,7 @@ const FIELDS_SEED = [
  {name:"西貝塚畑",lat:33.574992,lon:130.142253,area:1100,"所有":"借地","所有者":"熊本氏","栽培作物":"玉ねぎ、にんにく、人参、ホウレン草","住所":"糸島市志摩西貝塚","備考":"2025.11〜開始"}
 ];
 const WEED_WINDOW_DAYS = 30; // この日数以内に除草記録があれば「除草済み」
-let mapObj=null, mapRecords=[], mapStatus={}, fieldList=[], fieldLayer=null, layerByName={}, meMarker=null, mapReady=false, formCoord=null, locateForForm=false;
+let mapObj=null, mapRecords=[], mapWorkRecords=[], mapStatus={}, fieldList=[], fieldLayer=null, layerByName={}, meMarker=null, mapReady=false, formCoord=null, locateForForm=false, workCat=null;
 
 function pd(s){ const m=String(s||'').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,+m[3]):null; }
 function daysAgo(d){ return Math.floor((Date.now()-d.getTime())/86400000); }
@@ -525,9 +550,10 @@ function makeSquare(lat,lon,area){
 }
 
 async function loadFieldStatus(){
-  mapStatus={}; mapRecords=[];
+  mapStatus={}; mapRecords=[]; mapWorkRecords=[];
   if(!CONFIG.GAS_URL) return;
   try{ const r=await fetch(CONFIG.GAS_URL+'?action=listSpray'); const j=await r.json(); mapRecords=(j&&j.records)?j.records:[]; }catch(e){ mapRecords=[]; }
+  try{ const r2=await fetch(CONFIG.GAS_URL+'?action=listWork'); const j2=await r2.json(); mapWorkRecords=(j2&&j2.records)?j2.records:[]; }catch(e){ mapWorkRecords=[]; }
   mapRecords.forEach(rec=>{
     const f=String(rec['圃場']||''); if(!f)return;
     const d=pd(rec['散布日']); const ku=String(rec['区分']||'');
@@ -535,7 +561,23 @@ async function loadFieldStatus(){
     const s=mapStatus[f];
     if(ku.indexOf('除草')>=0){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)) s.lastWeed=d; }
   });
+  mapWorkRecords.forEach(rec=>{
+    const f=String(rec['圃場']||''); if(!f)return;
+    const d=pd(rec['作業日']); const ka=String(rec['カテゴリ']||'');
+    if(!mapStatus[f]) mapStatus[f]={done:false,lastWeed:null,weedCount:0};
+    const s=mapStatus[f];
+    if(ka==='除草'){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)) s.lastWeed=d; }
+  });
   Object.values(mapStatus).forEach(s=>{ s.done = s.lastWeed && daysAgo(s.lastWeed)<=WEED_WINDOW_DAYS; });
+}
+
+// 圃場ポップアップ用：散布記録＋作業記録を統合した「直近の作業」リスト
+function recentForField(name){
+  const a = mapRecords.filter(r=>String(r['圃場'])===name)
+    .map(r=>({nm:r['農薬名'],badge:String(r['区分']||'')==='除草'?'除草':'消毒',cls:String(r['区分']||'')==='除草'?'j':'s',d:pd(r['散布日'])}));
+  const b = mapWorkRecords.filter(r=>String(r['圃場'])===name)
+    .map(r=>({nm:r['作業内容']||r['カテゴリ'],badge:r['カテゴリ'],cls:String(r['カテゴリ'])==='除草'?'j':'w',d:pd(r['作業日'])}));
+  return a.concat(b).sort((x,y)=>(y.d?y.d:0)-(x.d?x.d:0)).slice(0,5);
 }
 
 // 圃場一覧をGASから取得（無ければ埋め込みseed）
@@ -591,9 +633,7 @@ async function initMap(){
 function openField(f){
   const name=f.name;
   const s=mapStatus[name]||{done:false,lastWeed:null,weedCount:0};
-  const recent=mapRecords.filter(r=>String(r['圃場'])===name)
-    .map(r=>({nm:r['農薬名'],ku:String(r['区分']||''),d:pd(r['散布日'])}))
-    .sort((a,b)=>(b.d?b.d:0)-(a.d?a.d:0)).slice(0,4);
+  const recent=recentForField(name);
   const meta=k=>{ const v=(f[k]||'').toString().trim(); return v?'<b>'+esc(v)+'</b>':'<b class="empty">未登録</b>'; };
   const weedLine=s.lastWeed?'<div class="v">'+fmtD(s.lastWeed)+' <small>（'+daysAgo(s.lastWeed)+'日前・通算'+s.weedCount+'回）</small></div>':'<div class="v"><span style="color:#AEB8AA">記録なし</span></div>';
   const areaTxt=f.area?('<b>'+comma(f.area)+' ㎡</b>'):'<b class="empty">未登録</b>';
@@ -608,8 +648,8 @@ function openField(f){
       '<div><span>所有者</span>'+meta('所有者')+'</div></div>'+
     '<div class="weed" style="margin-top:9px"><div class="t">住所</div><div class="v" style="font-size:13px">'+(f['住所']?esc(f['住所']):'—')+'</div></div>'+
     (f['備考']?('<div class="weed" style="margin-top:9px"><div class="t">備考</div><div class="v" style="font-size:13px">'+esc(f['備考'])+'</div></div>'):'')+
-    '<div class="frecent"><div class="t">直近の散布</div>'+
-    (recent.length?recent.map(r=>'<div class="frow"><div><span class="b '+(r.ku.indexOf('除草')>=0?'j':'s')+'">'+(r.ku.indexOf('除草')>=0?'除草':'消毒')+'</span>'+esc(r.nm||'—')+'</div><div class="dt">'+fmtD(r.d)+'</div></div>').join(''):'<div class="fempty">この圃場の散布記録はまだありません。</div>')+
+    '<div class="frecent"><div class="t">直近の作業（散布・作業報告）</div>'+
+    (recent.length?recent.map(r=>'<div class="frow"><div><span class="b '+r.cls+'">'+esc(r.badge)+'</span>'+esc(r.nm||'—')+'</div><div class="dt">'+fmtD(r.d)+'</div></div>').join(''):'<div class="fempty">この圃場の作業記録はまだありません。</div>')+
     '</div>';
   document.getElementById('fScrim').classList.add('show');
   document.getElementById('fSheet').classList.add('show');
@@ -673,11 +713,79 @@ function saveField(){
   }).catch(()=>toast('保存に失敗しました。通信を確認してください'));
 }
 
+/* ============== 作業報告 ============== */
+async function openWorkForm(){
+  if(!fieldList.length) await loadFields(); // 圃場マップを開かずに使う場合の保険
+  workCat=null;
+  renderWorkForm();
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+}
+function renderWorkForm(){
+  const today=new Date().toISOString().slice(0,10);
+  const fieldOpts=(fieldList.length?fieldList.map(f=>f.name):FIELDS).map(n=>'<option>'+esc(n)+'</option>').join('');
+  const catBtns=Object.keys(WORK_CATEGORIES).map(c=>
+    '<button class="catbtn" data-cat="'+esc(c)+'" aria-pressed="'+(workCat===c?'true':'false')+'">'+esc(c)+'</button>').join('');
+  const subs=workCat?WORK_CATEGORIES[workCat]:[];
+  const subHtml = workCat ? (
+    subs.length
+      ? '<div class="subchips" id="wSubs">'+subs.map(s=>'<button class="subchip" data-sub="'+esc(s)+'">'+esc(s)+'</button>').join('')+
+        '<button class="subchip" data-sub="__free">その他（自由入力）</button></div>'
+        +'<div class="field" id="wFreeWrap" style="margin-top:9px;display:none"><input id="w_free" placeholder="作業内容を入力"></div>'
+      : '<div class="field" style="margin-top:9px"><input id="w_free" placeholder="作業内容を入力（例：草刈り、見回りなど）"></div>'
+  ) : '';
+  document.getElementById('fSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">作業報告</div></div>'+
+    '<div class="rec">'+
+      '<div class="field"><label>カテゴリー</label><div class="catgrid">'+catBtns+'</div>'+subHtml+'</div>'+
+      '<div class="field"><label>圃場</label><select id="w_field">'+fieldOpts+'</select></div>'+
+      '<div class="two">'+
+        '<div class="field"><label>作業日</label><input id="w_date" type="date" value="'+today+'"></div>'+
+        '<div class="field"><label>時間（任意）</label><input id="w_hours" placeholder="例：1.5h"></div></div>'+
+      '<div class="field"><label>メモ（任意）</label><input id="w_memo" placeholder="天候・作業の様子など"></div>'+
+      '<button class="save" id="w_save">この内容で記録する</button>'+
+      '<div class="note">この記録は圃場マップのポップアップ「直近の作業」にも表示されます。カテゴリーが<b>除草</b>の場合、除草済み／未処理の判定にも反映されます。</div>'+
+    '</div>';
+  document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{ workCat=b.dataset.cat; renderWorkForm(); });
+  document.querySelectorAll('.subchip').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.subchip').forEach(x=>x.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');
+    const wrap=document.getElementById('wFreeWrap');
+    if(b.dataset.sub==='__free'){ wrap.style.display='block'; wrap.dataset.chosen=''; }
+    else{ wrap.style.display='none'; wrap.dataset.chosen=b.dataset.sub; }
+  });
+  const sv=document.getElementById('w_save'); if(sv) sv.onclick=saveWork;
+}
+function currentWorkContent(){
+  if(!workCat) return '';
+  const subs=WORK_CATEGORIES[workCat];
+  if(!subs.length) return valOf('w_free').trim();
+  const wrap=document.getElementById('wFreeWrap');
+  if(wrap && wrap.dataset.chosen) return wrap.dataset.chosen;
+  if(wrap && wrap.style.display!=='none') return valOf('w_free').trim();
+  return '';
+}
+function saveWork(){
+  if(!workCat){ toast('カテゴリーを選んでください'); return; }
+  const content=currentWorkContent();
+  if(!content){ toast('作業内容を選ぶか入力してください'); return; }
+  if(!CONFIG.GAS_URL){ toast('GAS未接続のため保存できません'); return; }
+  const rec={line_user:CONFIG.LINE_USER, 圃場:valOf('w_field'), 作業日:valOf('w_date'),
+    カテゴリ:workCat, 作業内容:content, 時間:valOf('w_hours'), メモ:valOf('w_memo')};
+  const url=CONFIG.GAS_URL+'?action=addWork&'+new URLSearchParams(rec).toString();
+  fetch(url).then(r=>r.json()).then(async(j)=>{
+    if(j&&j.ok){ closeFieldSheet(); toast('作業を記録しました'); if(mapReady) await loadFieldStatus(); }
+    else toast('保存に失敗しました');
+  }).catch(()=>toast('保存に失敗しました。通信を確認してください'));
+}
+
 document.getElementById('fScrim').onclick=closeFieldSheet;
 document.getElementById('openMap').onclick=async()=>{ document.getElementById('mapView').classList.add('show'); await initMap(); setTimeout(()=>mapObj&&mapObj.invalidateSize(),80); };
 document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.getElementById('mapView').classList.remove('show'); };
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
+document.getElementById('openWork').onclick=openWorkForm;
+
 
 </script>
 </body>
