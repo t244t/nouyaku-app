@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>農・みのり 農薬管理</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
   --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
@@ -124,6 +126,68 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   opacity:0;transition:all .25s;max-width:90vw;box-shadow:var(--shadow)}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .demoflag{font-size:10.5px;color:var(--warn);background:var(--warn-bg);border-radius:6px;padding:1px 6px;font-weight:700}
+
+/* 圃場マップを開くボタン（ヘッダー） */
+.mapbtn{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--stem-dk);
+  font-size:12px;font-weight:800;padding:6px 11px;border-radius:10px;cursor:pointer;display:inline-flex;
+  align-items:center;gap:5px;box-shadow:var(--shadow)}
+.mapbtn:active{transform:scale(.97)}
+
+/* 地図ビュー（全画面オーバーレイ） */
+#mapView{position:fixed;inset:0;z-index:900;background:#2b3a2b;display:none}
+#mapView.show{display:block}
+#map{position:absolute;inset:0}
+.leaflet-tile{filter:contrast(1.04) saturate(1.02)}
+.leaflet-container{background:#2b3a2b;font-family:inherit}
+.mtop{position:absolute;z-index:1000;top:0;left:0;right:0;
+  padding:calc(env(safe-area-inset-top) + 12px) 14px 14px;
+  background:linear-gradient(to bottom,rgba(18,26,18,.8),rgba(18,26,18,0));pointer-events:none}
+.mtop .row{display:flex;align-items:center;gap:10px;color:#fff;pointer-events:auto}
+.mtop h2{margin:0;font-size:16px;font-weight:800;letter-spacing:.04em;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.mclose{margin-left:auto;width:34px;height:34px;border-radius:10px;border:0;background:rgba(255,255,255,.92);
+  display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
+.mlegend{margin-top:9px;display:inline-flex;gap:6px;pointer-events:auto}
+.mlegend .lg{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);
+  border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;box-shadow:var(--shadow)}
+.mlegend .dot{width:11px;height:11px;border-radius:3px}
+.dot.done{background:var(--stem)} .dot.todo{background:var(--jokusou)}
+.mlegend .done-t{color:var(--stem-dk)} .mlegend .todo-t{color:var(--jokusou)}
+.fld-label{background:rgba(18,26,18,.62);color:#fff;font-size:11px;font-weight:700;
+  padding:2px 7px;border-radius:7px;border:0;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.locate{position:absolute;z-index:1000;right:14px;bottom:calc(env(safe-area-inset-bottom) + 18px);
+  width:46px;height:46px;border-radius:14px;border:0;background:var(--card);box-shadow:var(--shadow);
+  display:grid;place-items:center;cursor:pointer}
+.locate svg{color:var(--stem-dk)}.locate:active{transform:scale(.95)}
+
+/* 圃場シート（農薬シートと同じ作法・地図より前面） */
+#fScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#fScrim.show{opacity:1;pointer-events:auto}
+#fSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);
+  border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
+  transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:86vh;overflow:auto;
+  box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#fSheet.show{transform:translateY(0)}
+.fh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 2px}
+.fh .nm{font-size:21px;font-weight:800}
+.fh .grp{font-size:12px;color:var(--soft)}
+.fstatus{font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;white-space:nowrap}
+.fstatus.done{background:#E4F0E6;color:var(--stem-dk)}
+.fstatus.todo{background:var(--warn-bg);color:var(--jokusou)}
+.weed{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
+.weed .t{font-size:11px;letter-spacing:.1em;color:var(--soft);font-weight:700}
+.weed .v{font-size:15px;font-weight:800;margin-top:3px}
+.weed .v small{font-weight:600;color:var(--soft);font-size:12px}
+.fkv{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.fkv div{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:10px 12px}
+.fkv span{display:block;color:var(--soft);font-size:11px;font-weight:700;margin-bottom:3px}
+.fkv b{font-size:15px;font-weight:800}.fkv b.empty{color:#AEB8AA}
+.frecent{margin-top:12px}.frecent .t{font-size:11px;letter-spacing:.1em;color:var(--soft);font-weight:700;margin-bottom:6px}
+.frow{display:flex;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--line);
+  border-radius:11px;padding:9px 12px;margin-bottom:6px;font-size:13px}
+.frow .b{display:inline-block;font-size:10px;font-weight:800;border-radius:6px;padding:1px 6px;margin-right:6px}
+.frow .b.s{background:#E6F0F1;color:var(--shoudoku)}.frow .b.j{background:#F6ECE0;color:var(--jokusou)}
+.frow .dt{color:var(--soft);white-space:nowrap}
+.fempty{color:var(--soft);font-size:13px;text-align:center;padding:12px}
 </style>
 </head>
 <body>
@@ -133,7 +197,11 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       <span class="leaf">🌱</span>
       <h1>農薬管理</h1>
       <span class="sub">農・みのり</span>
-      <span id="demoFlag" class="demoflag" style="margin-left:auto">プレビュー版</span>
+      <button class="mapbtn" id="openMap" style="margin-left:auto">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>
+        圃場マップ
+      </button>
+      <span id="demoFlag" class="demoflag">プレビュー版</span>
     </div>
     <div class="crumbs" id="crumbs">品目を選んでください</div>
   </header>
@@ -161,6 +229,28 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 <div class="sheet" id="sheet"><div class="grab"></div><div class="sheet-in" id="sheetIn"></div></div>
 <div class="toast" id="toast"></div>
 
+<!-- 圃場マップ（全画面オーバーレイ） -->
+<div id="mapView">
+  <div id="map"></div>
+  <div class="mtop">
+    <div class="row">
+      <h2>圃場マップ</h2>
+      <button class="mclose" id="closeMap" title="閉じる">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F4F2A" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="mlegend">
+      <span class="lg"><span class="dot done"></span><span class="done-t">除草済み</span></span>
+      <span class="lg"><span class="dot todo"></span><span class="todo-t">未処理</span></span>
+    </div>
+  </div>
+  <button class="locate" id="locate" title="現在地">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+</div>
+<div id="fScrim"></div>
+<div id="fSheet"><div class="grab"></div><div class="sheet-in" id="fSheetIn"></div></div>
+
 <script>
 /* ============== 設定（デプロイ時に書き換え） ============== */
 const CONFIG = {
@@ -169,7 +259,7 @@ const CONFIG = {
   // 散布記録を書き込むGASのURL（健康管理アプリと同じGET方式）
   GAS_URL:   "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec", // 例: https://script.google.com/macros/s/XXXX/exec
   // 農薬アプリ用に新規作成するLIFF ID
-  LIFF_ID:   "2010414099-CsZtyiLo", // 例: 2010xxxxxx-xxxxxxxx
+  LIFF_ID:   "", // 例: 2010xxxxxx-xxxxxxxx
   LINE_USER: "Uf760e5551fafc369a0a2527dc30cf563" // LINE外プレビュー時の仮ID
 };
 /* 圃場（記憶済みの7か所） */
@@ -402,6 +492,85 @@ let tg; function toast(msg){ const t=document.getElementById('toast');
   t.textContent=msg; t.classList.add('show'); clearTimeout(tg);
   tg=setTimeout(()=>t.classList.remove('show'),2600); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
+
+/* ============== 圃場マップ ============== */
+const FIELDS_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"ねぎ前上","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19514999999998,33.55688],[130.19595,33.55688],[130.19595,33.557520000000004],[130.19514999999998,33.557520000000004],[130.19514999999998,33.55688]]]}},{"type":"Feature","properties":{"name":"ねぎ前下","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19625,33.55688],[130.19705000000002,33.55688],[130.19705000000002,33.557520000000004],[130.19625,33.557520000000004],[130.19625,33.55688]]]}},{"type":"Feature","properties":{"name":"ねぎ横畑","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19735,33.55688],[130.19815000000003,33.55688],[130.19815000000003,33.557520000000004],[130.19735,33.557520000000004],[130.19735,33.55688]]]}},{"type":"Feature","properties":{"name":"ねぎ横畑先","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19845,33.55688],[130.19925000000003,33.55688],[130.19925000000003,33.557520000000004],[130.19845,33.557520000000004],[130.19845,33.55688]]]}},{"type":"Feature","properties":{"name":"みかん山","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19514999999998,33.55598],[130.19595,33.55598],[130.19595,33.55662],[130.19514999999998,33.55662],[130.19514999999998,33.55598]]]}},{"type":"Feature","properties":{"name":"羽根戸田んぼ","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19625,33.55598],[130.19705000000002,33.55598],[130.19705000000002,33.55662],[130.19625,33.55662],[130.19625,33.55598]]]}},{"type":"Feature","properties":{"name":"西貝塚畑","group":"圃場","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19735,33.55598],[130.19815000000003,33.55598],[130.19815000000003,33.55662],[130.19735,33.55662],[130.19735,33.55598]]]}},{"type":"Feature","properties":{"name":"除草管理1","group":"除草管理","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19845,33.55598],[130.19925000000003,33.55598],[130.19925000000003,33.55662],[130.19845,33.55662],[130.19845,33.55598]]]}},{"type":"Feature","properties":{"name":"除草管理2","group":"除草管理","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19514999999998,33.55508],[130.19595,33.55508],[130.19595,33.55572],[130.19514999999998,33.55572],[130.19514999999998,33.55508]]]}},{"type":"Feature","properties":{"name":"除草管理3","group":"除草管理","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19625,33.55508],[130.19705000000002,33.55508],[130.19705000000002,33.55572],[130.19625,33.55572],[130.19625,33.55508]]]}},{"type":"Feature","properties":{"name":"除草管理4","group":"除草管理","品種":"","播種日":"","施肥":"","収量":""},"geometry":{"type":"Polygon","coordinates":[[[130.19735,33.55508],[130.19815000000003,33.55508],[130.19815000000003,33.55572],[130.19735,33.55572],[130.19735,33.55508]]]}}]};
+const WEED_WINDOW_DAYS = 30; // この日数以内に除草記録があれば「除草済み」
+let mapObj=null, mapRecords=[], mapStatus={}, layerByName={}, meMarker=null, mapReady=false;
+
+function pd(s){ const m=String(s||'').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,+m[3]):null; }
+function daysAgo(d){ return Math.floor((Date.now()-d.getTime())/86400000); }
+function fmtD(d){ return d? d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate():'—'; }
+function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+async function loadFieldStatus(){
+  mapStatus={}; mapRecords=[];
+  if(!CONFIG.GAS_URL) return;
+  try{ const r=await fetch(CONFIG.GAS_URL+'?action=listSpray'); const j=await r.json(); mapRecords=(j&&j.records)?j.records:[]; }catch(e){ mapRecords=[]; }
+  mapRecords.forEach(rec=>{
+    const f=String(rec['圃場']||''); if(!f)return;
+    const d=pd(rec['散布日']); const ku=String(rec['区分']||'');
+    if(!mapStatus[f]) mapStatus[f]={done:false,lastWeed:null,weedCount:0};
+    const s=mapStatus[f];
+    if(ku.indexOf('除草')>=0){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)) s.lastWeed=d; }
+  });
+  Object.values(mapStatus).forEach(s=>{ s.done = s.lastWeed && daysAgo(s.lastWeed)<=WEED_WINDOW_DAYS; });
+}
+function fStyle(name){ const done=mapStatus[name]&&mapStatus[name].done; const c=done?getCss('--stem'):getCss('--jokusou'); return {color:c,weight:2.5,opacity:.95,fillColor:c,fillOpacity:.28}; }
+function buildLayers(){
+  layerByName={};
+  const layer=L.geoJSON(FIELDS_GEOJSON,{
+    style:f=>fStyle(f.properties.name),
+    onEachFeature:(f,lyr)=>{
+      const name=f.properties.name; layerByName[name]=lyr;
+      lyr.on('click',()=>openField(f.properties));
+      const c=lyr.getBounds().getCenter();
+      L.marker(c,{icon:L.divIcon({className:'',html:'<div class="fld-label">'+esc(name)+'</div>',iconSize:[0,0]}),interactive:false}).addTo(mapObj);
+    }
+  }).addTo(mapObj);
+  try{ mapObj.fitBounds(layer.getBounds().pad(0.25)); }catch(e){}
+}
+async function initMap(){
+  if(mapReady) return; mapReady=true;
+  mapObj=L.map('map',{zoomControl:false}).setView([33.5563,130.1972],16);
+  L.control.zoom({position:'bottomleft'}).addTo(mapObj);
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'衛星写真 © Esri, Maxar'}).addTo(mapObj);
+  mapObj.on('locationfound',e=>{ if(meMarker) mapObj.removeLayer(meMarker); meMarker=L.circleMarker(e.latlng,{radius:7,color:'#fff',weight:2,fillColor:'#1E6F7A',fillOpacity:1}).addTo(mapObj); });
+  await loadFieldStatus();
+  buildLayers();
+  setTimeout(()=>mapObj.invalidateSize(),60);
+}
+function openField(p){
+  const name=p.name;
+  const s=mapStatus[name]||{done:false,lastWeed:null,weedCount:0};
+  const recent=mapRecords.filter(r=>String(r['圃場'])===name)
+    .map(r=>({nm:r['農薬名'],ku:String(r['区分']||''),d:pd(r['散布日'])}))
+    .sort((a,b)=>(b.d?b.d:0)-(a.d?a.d:0)).slice(0,4);
+  const meta=k=>{ const v=(p[k]||'').toString().trim(); return v?'<b>'+esc(v)+'</b>':'<b class="empty">未登録</b>'; };
+  const weedLine=s.lastWeed?'<div class="v">'+fmtD(s.lastWeed)+' <small>（'+daysAgo(s.lastWeed)+'日前・通算'+s.weedCount+'回）</small></div>':'<div class="v"><span style="color:#AEB8AA">記録なし</span></div>';
+  document.getElementById('fSheetIn').innerHTML=
+    '<div class="fh"><div><div class="nm">'+esc(name)+'</div><div class="grp">'+esc(p.group||'')+'</div></div>'+
+      '<span class="fstatus '+(s.done?'done':'todo')+'">'+(s.done?'除草済み':'未処理')+'</span></div>'+
+    '<div class="weed"><div class="t">最終除草</div>'+weedLine+'</div>'+
+    '<div class="fkv">'+
+      '<div><span>作付け品種</span>'+meta('品種')+'</div>'+
+      '<div><span>播種・定植日</span>'+meta('播種日')+'</div>'+
+      '<div><span>施肥履歴</span>'+meta('施肥')+'</div>'+
+      '<div><span>収量</span>'+meta('収量')+'</div></div>'+
+    '<div class="frecent"><div class="t">直近の散布</div>'+
+    (recent.length?recent.map(r=>'<div class="frow"><div><span class="b '+(r.ku.indexOf('除草')>=0?'j':'s')+'">'+(r.ku.indexOf('除草')>=0?'除草':'消毒')+'</span>'+esc(r.nm||'—')+'</div><div class="dt">'+fmtD(r.d)+'</div></div>').join(''):'<div class="fempty">この圃場の散布記録はまだありません。</div>')+
+    '</div>';
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5}));
+  if(layerByName[name]) layerByName[name].setStyle({weight:5});
+}
+function closeFieldSheet(){ document.getElementById('fScrim').classList.remove('show'); document.getElementById('fSheet').classList.remove('show'); Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5})); }
+document.getElementById('fScrim').onclick=closeFieldSheet;
+document.getElementById('openMap').onclick=async()=>{ document.getElementById('mapView').classList.add('show'); await initMap(); setTimeout(()=>mapObj&&mapObj.invalidateSize(),80); };
+document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.getElementById('mapView').classList.remove('show'); };
+document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
+
 </script>
 </body>
 </html>
