@@ -146,6 +146,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .mtop h2{margin:0;font-size:16px;font-weight:800;letter-spacing:.04em;text-shadow:0 1px 4px rgba(0,0,0,.5)}
 .mclose{margin-left:auto;width:34px;height:34px;border-radius:10px;border:0;background:rgba(255,255,255,.92);
   display:grid;place-items:center;cursor:pointer;box-shadow:var(--shadow)}
+.maddbtn{border:0;background:rgba(255,255,255,.94);color:var(--stem-dk);font-size:12px;font-weight:800;
+  padding:0 12px;height:34px;border-radius:10px;cursor:pointer;box-shadow:var(--shadow);white-space:nowrap}
+.maddbtn:active{transform:scale(.96)}
 .mlegend{margin-top:9px;display:inline-flex;gap:6px;pointer-events:auto}
 .mlegend .lg{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);
   border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;box-shadow:var(--shadow)}
@@ -235,6 +238,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div class="mtop">
     <div class="row">
       <h2>圃場マップ</h2>
+      <button class="maddbtn" id="addField" style="margin-left:auto">＋ 圃場を追加</button>
       <button class="mclose" id="closeMap" title="閉じる">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F4F2A" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -494,14 +498,31 @@ let tg; function toast(msg){ const t=document.getElementById('toast');
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
 /* ============== 圃場マップ ============== */
-const FIELDS_GEOJSON = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"name":"ねぎ前上","group":"圃場","栽培作物":"オクラ,カボチャ,バターピーナッツ","面積":"3,145","所有":"所有","所有者":"農・みのり","住所":"糸島市飯原字片山崎1671番地","備考":"2023.4〜取得"},"geometry":{"type":"Polygon","coordinates":[[[130.19948835,33.51183759],[130.20009257,33.51183759],[130.20009257,33.51234137],[130.19948835,33.51234137],[130.19948835,33.51183759]]]}},{"type":"Feature","properties":{"name":"ねぎ前下","group":"圃場","栽培作物":"菜の花","面積":"2,025","所有":"所有","所有者":"農・みのり","住所":"糸島市飯原字片山崎1676番地","備考":"2023.4〜取得"},"geometry":{"type":"Polygon","coordinates":[[[130.19950975,33.51261206],[130.19999459,33.51261206],[130.19999459,33.5130163],[130.19950975,33.5130163],[130.19950975,33.51261206]]]}},{"type":"Feature","properties":{"name":"ねぎ横畑","group":"圃場","栽培作物":"","面積":"2,424","所有":"未定","所有者":"古川氏","住所":"糸島市飯原字片山崎1677-1番地","備考":"未定"},"geometry":{"type":"Polygon","coordinates":[[[130.20024386,33.51302697],[130.20077432,33.51302697],[130.20077432,33.51346924],[130.20024386,33.51346924],[130.20024386,33.51302697]]]}},{"type":"Feature","properties":{"name":"ねぎ横畑先","group":"圃場","栽培作物":"","面積":"327","所有":"未定","所有者":"重松氏","住所":"糸島市飯原字片山崎1678-1番地","備考":"未定"},"geometry":{"type":"Polygon","coordinates":[[[130.20092178,33.51303957],[130.20111661,33.51303957],[130.20111661,33.51320201],[130.20092178,33.51320201],[130.20092178,33.51303957]]]}},{"type":"Feature","properties":{"name":"みかん山","group":"圃場","栽培作物":"デコポン、アンコールオレンジ","面積":"","所有":"未定","所有者":"農・みのり","住所":"糸島市加也","備考":"未定"},"geometry":{"type":"Polygon","coordinates":[[[130.13948813,33.57713067],[130.13997033,33.57713067],[130.13997033,33.5775324],[130.13948813,33.5775324],[130.13948813,33.57713067]]]}},{"type":"Feature","properties":{"name":"羽根戸田んぼ","group":"圃場","栽培作物":"水稲 ヒノヒカリ","面積":"1,374","所有":"所有","所有者":"農・みのり","住所":"福岡市西区大字飯盛字キシノ上25","備考":"未定"},"geometry":{"type":"Polygon","coordinates":[[[130.32007625,33.54062751],[130.32047575,33.54062751],[130.32047575,33.54096049],[130.32007625,33.54096049],[130.32007625,33.54062751]]]}},{"type":"Feature","properties":{"name":"西貝塚畑","group":"圃場","栽培作物":"玉ねぎ、にんにく、人参、ホウレン草","面積":"1,100","所有":"借地","所有者":"熊本氏","住所":"糸島市志摩西貝塚","備考":"2025.11〜開始"},"geometry":{"type":"Polygon","coordinates":[[[130.1420742,33.57484303],[130.1424318,33.57484303],[130.1424318,33.57514097],[130.1420742,33.57514097],[130.1420742,33.57484303]]]}}]};
+const FIELDS_SEED = [
+ {name:"ねぎ前上",lat:33.51208947754096,lon:130.19979046061408,area:3145,"所有":"所有","所有者":"農・みのり","栽培作物":"オクラ,カボチャ,バターピーナッツ","住所":"糸島市飯原字片山崎1671番地","備考":"2023.4〜取得"},
+ {name:"ねぎ前下",lat:33.512814184439,lon:130.1997521728344,area:2025,"所有":"所有","所有者":"農・みのり","栽培作物":"菜の花","住所":"糸島市飯原字片山崎1676番地","備考":"2023.4〜取得"},
+ {name:"ねぎ横畑",lat:33.513248106249705,lon:130.20050908813062,area:2424,"所有":"未定","所有者":"古川氏","栽培作物":"","住所":"糸島市飯原字片山崎1677-1番地","備考":"未定"},
+ {name:"ねぎ横畑先",lat:33.51312078849823,lon:130.20101919506,area:327,"所有":"未定","所有者":"重松氏","栽培作物":"","住所":"糸島市飯原字片山崎1678-1番地","備考":"未定"},
+ {name:"みかん山",lat:33.577331533979205,lon:130.1397292313575,area:0,"所有":"未定","所有者":"農・みのり","栽培作物":"デコポン、アンコールオレンジ","住所":"糸島市加也","備考":"未定"},
+ {name:"羽根戸田んぼ",lat:33.540794,lon:130.320276,area:1374,"所有":"所有","所有者":"農・みのり","栽培作物":"水稲 ヒノヒカリ","住所":"福岡市西区大字飯盛字キシノ上25","備考":"未定"},
+ {name:"西貝塚畑",lat:33.574992,lon:130.142253,area:1100,"所有":"借地","所有者":"熊本氏","栽培作物":"玉ねぎ、にんにく、人参、ホウレン草","住所":"糸島市志摩西貝塚","備考":"2025.11〜開始"}
+];
 const WEED_WINDOW_DAYS = 30; // この日数以内に除草記録があれば「除草済み」
-let mapObj=null, mapRecords=[], mapStatus={}, layerByName={}, meMarker=null, mapReady=false;
+let mapObj=null, mapRecords=[], mapStatus={}, fieldList=[], fieldLayer=null, layerByName={}, meMarker=null, mapReady=false, formCoord=null, locateForForm=false;
 
 function pd(s){ const m=String(s||'').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,+m[3]):null; }
 function daysAgo(d){ return Math.floor((Date.now()-d.getTime())/86400000); }
 function fmtD(d){ return d? d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate():'—'; }
 function getCss(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+function comma(n){ n=Number(n)||0; return n? n.toLocaleString('ja-JP'):''; }
+function valOf(id){ const e=document.getElementById(id); return e? e.value:''; }
+
+// 面積(㎡)から中心まわりの四角[[lat,lon]...]を作る
+function makeSquare(lat,lon,area){
+  const a=(area&&area>0)?area:2000; const half=Math.sqrt(a)/2;
+  const dlat=half/111320, dlon=half/(111320*Math.cos(lat*Math.PI/180));
+  return [[lat-dlat,lon-dlon],[lat-dlat,lon+dlon],[lat+dlat,lon+dlon],[lat+dlat,lon-dlon]];
+}
 
 async function loadFieldStatus(){
   mapStatus={}; mapRecords=[];
@@ -516,49 +537,77 @@ async function loadFieldStatus(){
   });
   Object.values(mapStatus).forEach(s=>{ s.done = s.lastWeed && daysAgo(s.lastWeed)<=WEED_WINDOW_DAYS; });
 }
-function fStyle(name){ const done=mapStatus[name]&&mapStatus[name].done; const c=done?getCss('--stem'):getCss('--jokusou'); return {color:c,weight:2.5,opacity:.95,fillColor:c,fillOpacity:.28}; }
-function buildLayers(){
-  layerByName={};
-  const layer=L.geoJSON(FIELDS_GEOJSON,{
-    style:f=>fStyle(f.properties.name),
-    onEachFeature:(f,lyr)=>{
-      const name=f.properties.name; layerByName[name]=lyr;
-      lyr.on('click',()=>openField(f.properties));
-      const c=lyr.getBounds().getCenter();
-      L.marker(c,{icon:L.divIcon({className:'',html:'<div class="fld-label">'+esc(name)+'</div>',iconSize:[0,0]}),interactive:false}).addTo(mapObj);
-    }
-  }).addTo(mapObj);
-  try{ mapObj.fitBounds(layer.getBounds().pad(0.25)); }catch(e){}
+
+// 圃場一覧をGASから取得（無ければ埋め込みseed）
+async function loadFields(){
+  let list=null;
+  if(CONFIG.GAS_URL){
+    try{
+      const r=await fetch(CONFIG.GAS_URL+'?action=listFields'); const j=await r.json();
+      if(j&&j.fields&&j.fields.length){
+        list=j.fields.map(f=>({name:String(f['圃場名']),lat:Number(f['緯度']),lon:Number(f['経度']),
+          area:Number(f['面積'])||0, '所有':f['所有']||'', '所有者':f['所有者']||'',
+          '栽培作物':f['栽培作物']||'', '住所':f['住所']||'', '備考':f['備考']||''}));
+      }
+    }catch(e){}
+  }
+  fieldList = (list&&list.length)? list : FIELDS_SEED.slice();
 }
+
+function fStyle(name){ const done=mapStatus[name]&&mapStatus[name].done; const c=done?getCss('--stem'):getCss('--jokusou'); return {color:c,weight:2.5,opacity:.95,fillColor:c,fillOpacity:.28}; }
+
+function buildLayers(){
+  if(fieldLayer){ mapObj.removeLayer(fieldLayer); }
+  fieldLayer=L.layerGroup().addTo(mapObj); layerByName={};
+  const bounds=[];
+  fieldList.forEach(f=>{
+    if(!f.lat||!f.lon) return;
+    const ring=makeSquare(f.lat,f.lon,f.area);
+    const poly=L.polygon(ring, fStyle(f.name)).addTo(fieldLayer);
+    poly.on('click',()=>openField(f));
+    layerByName[f.name]=poly;
+    L.marker([f.lat,f.lon],{icon:L.divIcon({className:'',html:'<div class="fld-label">'+esc(f.name)+'</div>',iconSize:[0,0]}),interactive:false}).addTo(fieldLayer);
+    ring.forEach(pt=>bounds.push(pt));
+  });
+  try{ if(bounds.length) mapObj.fitBounds(bounds,{padding:[40,40]}); }catch(e){}
+}
+
+async function reloadMap(){ await loadFieldStatus(); await loadFields(); buildLayers(); }
+
 async function initMap(){
   if(mapReady) return; mapReady=true;
-  mapObj=L.map('map',{zoomControl:false}).setView([33.5563,130.1972],16);
+  mapObj=L.map('map',{zoomControl:false}).setView([33.5563,130.1972],14);
   L.control.zoom({position:'bottomleft'}).addTo(mapObj);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'衛星写真 © Esri, Maxar'}).addTo(mapObj);
-  mapObj.on('locationfound',e=>{ if(meMarker) mapObj.removeLayer(meMarker); meMarker=L.circleMarker(e.latlng,{radius:7,color:'#fff',weight:2,fillColor:'#1E6F7A',fillOpacity:1}).addTo(mapObj); });
-  await loadFieldStatus();
-  buildLayers();
+  mapObj.on('locationfound',e=>{
+    if(locateForForm){ formCoord={lat:e.latlng.lat,lng:e.latlng.lng}; locateForForm=false; updateFormCoord(); return; }
+    if(meMarker) mapObj.removeLayer(meMarker);
+    meMarker=L.circleMarker(e.latlng,{radius:7,color:'#fff',weight:2,fillColor:'#1E6F7A',fillOpacity:1}).addTo(mapObj);
+  });
+  await reloadMap();
   setTimeout(()=>mapObj.invalidateSize(),60);
 }
-function openField(p){
-  const name=p.name;
+
+function openField(f){
+  const name=f.name;
   const s=mapStatus[name]||{done:false,lastWeed:null,weedCount:0};
   const recent=mapRecords.filter(r=>String(r['圃場'])===name)
     .map(r=>({nm:r['農薬名'],ku:String(r['区分']||''),d:pd(r['散布日'])}))
     .sort((a,b)=>(b.d?b.d:0)-(a.d?a.d:0)).slice(0,4);
-  const meta=k=>{ const v=(p[k]||'').toString().trim(); return v?'<b>'+esc(v)+'</b>':'<b class="empty">未登録</b>'; };
+  const meta=k=>{ const v=(f[k]||'').toString().trim(); return v?'<b>'+esc(v)+'</b>':'<b class="empty">未登録</b>'; };
   const weedLine=s.lastWeed?'<div class="v">'+fmtD(s.lastWeed)+' <small>（'+daysAgo(s.lastWeed)+'日前・通算'+s.weedCount+'回）</small></div>':'<div class="v"><span style="color:#AEB8AA">記録なし</span></div>';
+  const areaTxt=f.area?('<b>'+comma(f.area)+' ㎡</b>'):'<b class="empty">未登録</b>';
   document.getElementById('fSheetIn').innerHTML=
-    '<div class="fh"><div><div class="nm">'+esc(name)+'</div><div class="grp">'+esc(p.group||'')+'</div></div>'+
+    '<div class="fh"><div><div class="nm">'+esc(name)+'</div><div class="grp">圃場</div></div>'+
       '<span class="fstatus '+(s.done?'done':'todo')+'">'+(s.done?'除草済み':'未処理')+'</span></div>'+
     '<div class="weed"><div class="t">最終除草</div>'+weedLine+'</div>'+
     '<div class="fkv">'+
       '<div><span>栽培作物</span>'+meta('栽培作物')+'</div>'+
-      '<div><span>面積</span>'+(p["面積"]?('<b>'+esc(p["面積"])+' ㎡</b>'):'<b class="empty">未登録</b>')+'</div>'+
+      '<div><span>面積</span>'+areaTxt+'</div>'+
       '<div><span>所有形態</span>'+meta('所有')+'</div>'+
       '<div><span>所有者</span>'+meta('所有者')+'</div></div>'+
-    '<div class="weed" style="margin-top:9px"><div class="t">住所</div><div class="v" style="font-size:13px">'+(p["住所"]?esc(p["住所"]):'—')+'</div></div>'+
-    (p["備考"]?('<div class="weed" style="margin-top:9px"><div class="t">備考</div><div class="v" style="font-size:13px">'+esc(p["備考"])+'</div></div>'):'')+
+    '<div class="weed" style="margin-top:9px"><div class="t">住所</div><div class="v" style="font-size:13px">'+(f['住所']?esc(f['住所']):'—')+'</div></div>'+
+    (f['備考']?('<div class="weed" style="margin-top:9px"><div class="t">備考</div><div class="v" style="font-size:13px">'+esc(f['備考'])+'</div></div>'):'')+
     '<div class="frecent"><div class="t">直近の散布</div>'+
     (recent.length?recent.map(r=>'<div class="frow"><div><span class="b '+(r.ku.indexOf('除草')>=0?'j':'s')+'">'+(r.ku.indexOf('除草')>=0?'除草':'消毒')+'</span>'+esc(r.nm||'—')+'</div><div class="dt">'+fmtD(r.d)+'</div></div>').join(''):'<div class="fempty">この圃場の散布記録はまだありません。</div>')+
     '</div>';
@@ -567,11 +616,56 @@ function openField(p){
   Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5}));
   if(layerByName[name]) layerByName[name].setStyle({weight:5});
 }
+
 function closeFieldSheet(){ document.getElementById('fScrim').classList.remove('show'); document.getElementById('fSheet').classList.remove('show'); Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5})); }
+
+/* ---- 圃場を追加 ---- */
+function updateFormCoord(){ const el=document.getElementById('ff_coord'); if(el&&formCoord) el.textContent=formCoord.lat.toFixed(6)+', '+formCoord.lng.toFixed(6); }
+function openFieldForm(){
+  const c=mapObj.getCenter(); formCoord={lat:c.lat,lng:c.lng};
+  document.getElementById('fSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">圃場を追加</div></div>'+
+    '<div class="rec">'+
+      '<div class="field"><label>圃場名（必須）</label><input id="ff_name" placeholder="例：南の畑"></div>'+
+      '<div class="weed" style="margin-top:0"><div class="t">位置（地図の中心）</div>'+
+        '<div class="v" id="ff_coord" style="font-size:13px">—</div>'+
+        '<button class="mapbtn" id="ff_locate" style="margin-top:8px">現在地を使う</button></div>'+
+      '<div class="two">'+
+        '<div class="field"><label>面積（㎡）</label><input id="ff_area" inputmode="numeric" placeholder="例：1200"></div>'+
+        '<div class="field"><label>所有形態</label><select id="ff_tenure"><option>所有</option><option>借地</option><option>未定</option></select></div></div>'+
+      '<div class="field"><label>所有者</label><input id="ff_owner" placeholder="例：農・みのり"></div>'+
+      '<div class="field"><label>栽培作物</label><input id="ff_crop" placeholder="例：玉ねぎ、にんにく"></div>'+
+      '<div class="field"><label>住所</label><input id="ff_addr" placeholder="例：糸島市..."></div>'+
+      '<div class="field"><label>備考</label><input id="ff_memo" placeholder="任意"></div>'+
+      '<button class="save" id="ff_save">この圃場を保存する</button>'+
+      '<div class="note">位置は<b>地図の中心</b>になります。追加したい畑が画面の中央に来るよう地図を動かしてから開くか、「現在地を使う」で今いる場所を使えます。形は面積からの四角で表示します（正確な輪郭は後で調整できます）。</div>'+
+    '</div>';
+  updateFormCoord();
+  document.getElementById('ff_locate').onclick=()=>{ locateForForm=true; toast('現在地を取得中…'); mapObj.locate({maxZoom:17}); };
+  document.getElementById('ff_save').onclick=saveField;
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+}
+function saveField(){
+  const name=valOf('ff_name').trim();
+  if(!name){ toast('圃場名を入力してください'); return; }
+  if(!CONFIG.GAS_URL){ toast('GAS未接続のため保存できません'); return; }
+  if(!formCoord){ toast('位置が取得できていません'); return; }
+  const rec={圃場名:name, 緯度:formCoord.lat, 経度:formCoord.lng,
+    面積:valOf('ff_area'), 所有:valOf('ff_tenure'), 所有者:valOf('ff_owner'),
+    栽培作物:valOf('ff_crop'), 住所:valOf('ff_addr'), 備考:valOf('ff_memo')};
+  const url=CONFIG.GAS_URL+'?action=addField&'+new URLSearchParams(rec).toString();
+  fetch(url).then(r=>r.json()).then(async(j)=>{
+    if(j&&j.ok){ closeFieldSheet(); toast('圃場を追加しました'); await reloadMap(); }
+    else toast('保存に失敗しました'); 
+  }).catch(()=>toast('保存に失敗しました。通信を確認してください'));
+}
+
 document.getElementById('fScrim').onclick=closeFieldSheet;
 document.getElementById('openMap').onclick=async()=>{ document.getElementById('mapView').classList.add('show'); await initMap(); setTimeout(()=>mapObj&&mapObj.invalidateSize(),80); };
 document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.getElementById('mapView').classList.remove('show'); };
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
+document.getElementById('addField').onclick=openFieldForm;
 
 </script>
 </body>
