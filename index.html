@@ -621,15 +621,25 @@ function closeFieldSheet(){ document.getElementById('fScrim').classList.remove('
 
 /* ---- 圃場を追加 ---- */
 function updateFormCoord(){ const el=document.getElementById('ff_coord'); if(el&&formCoord) el.textContent=formCoord.lat.toFixed(6)+', '+formCoord.lng.toFixed(6); }
+function parseCoord(s){
+  const m=String(s||'').match(/(-?\d{1,3}(?:\.\d+)?)\s*[,、\s]\s*(-?\d{1,3}(?:\.\d+)?)/);
+  if(!m) return null;
+  const lat=parseFloat(m[1]), lng=parseFloat(m[2]);
+  if(isNaN(lat)||isNaN(lng)||Math.abs(lat)>90||Math.abs(lng)>180) return null;
+  return {lat,lng};
+}
 function openFieldForm(){
   const c=mapObj.getCenter(); formCoord={lat:c.lat,lng:c.lng};
   document.getElementById('fSheetIn').innerHTML=
     '<div class="fh"><div class="nm">圃場を追加</div></div>'+
     '<div class="rec">'+
       '<div class="field"><label>圃場名（必須）</label><input id="ff_name" placeholder="例：南の畑"></div>'+
-      '<div class="weed" style="margin-top:0"><div class="t">位置（地図の中心）</div>'+
+      '<div class="weed" style="margin-top:0"><div class="t">位置</div>'+
         '<div class="v" id="ff_coord" style="font-size:13px">—</div>'+
-        '<button class="mapbtn" id="ff_locate" style="margin-top:8px">現在地を使う</button></div>'+
+        '<input id="ff_paste" placeholder="座標を貼り付け 例：33.512089, 130.199790" style="width:100%;margin-top:8px;border:1px solid var(--line);border-radius:11px;padding:10px 12px;font-size:14px;background:#fff">'+
+        '<div style="display:flex;gap:8px;margin-top:8px">'+
+          '<button class="mapbtn" id="ff_center">地図の中心を使う</button>'+
+          '<button class="mapbtn" id="ff_locate">現在地を使う</button></div></div>'+
       '<div class="two">'+
         '<div class="field"><label>面積（㎡）</label><input id="ff_area" inputmode="numeric" placeholder="例：1200"></div>'+
         '<div class="field"><label>所有形態</label><select id="ff_tenure"><option>所有</option><option>借地</option><option>未定</option></select></div></div>'+
@@ -638,9 +648,11 @@ function openFieldForm(){
       '<div class="field"><label>住所</label><input id="ff_addr" placeholder="例：糸島市..."></div>'+
       '<div class="field"><label>備考</label><input id="ff_memo" placeholder="任意"></div>'+
       '<button class="save" id="ff_save">この圃場を保存する</button>'+
-      '<div class="note">位置は<b>地図の中心</b>になります。追加したい畑が画面の中央に来るよう地図を動かしてから開くか、「現在地を使う」で今いる場所を使えます。形は面積からの四角で表示します（正確な輪郭は後で調整できます）。</div>'+
+      '<div class="note">座標を貼り付けるか、「地図の中心を使う」「現在地を使う」で位置を決められます。座標は<b>「緯度, 経度」</b>の順（Googleマップでコピーした形）。形は面積からの四角で表示します（正確な輪郭は後で調整できます）。</div>'+
     '</div>';
   updateFormCoord();
+  document.getElementById('ff_paste').oninput=(e)=>{ const c=parseCoord(e.target.value); if(c){ formCoord=c; updateFormCoord(); if(mapObj) mapObj.panTo([c.lat,c.lng]); } };
+  document.getElementById('ff_center').onclick=()=>{ const c=mapObj.getCenter(); formCoord={lat:c.lat,lng:c.lng}; updateFormCoord(); toast('地図の中心を使います'); };
   document.getElementById('ff_locate').onclick=()=>{ locateForForm=true; toast('現在地を取得中…'); mapObj.locate({maxZoom:17}); };
   document.getElementById('ff_save').onclick=saveField;
   document.getElementById('fScrim').classList.add('show');
