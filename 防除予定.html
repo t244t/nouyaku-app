@@ -36,6 +36,11 @@
   .cell.today{ background:#fffdf3; box-shadow:inset 0 0 0 2px #f0c14b; }
   .dnum{ font-size:.7rem; color:var(--sub); }
   .dnum.sun{ color:#c0392b; } .dnum.sat{ color:#2266bb; }
+  .drow{ display:flex; align-items:center; justify-content:space-between; gap:2px; }
+  .rain{ font-size:.58rem; padding:0 3px; border-radius:4px; line-height:1.45; white-space:nowrap; }
+  .rain.r1{ color:#6a8aa3; }
+  .rain.r2{ color:#1f6fd6; font-weight:700; }
+  .rain.r3{ color:#fff; background:#1f6fd6; font-weight:700; }
   .chip{ display:block; font-size:.64rem; line-height:1.25; margin-top:2px; padding:2px 4px;
     border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   .chip.plan{ border:1px solid var(--plan); color:var(--plan); background:var(--plan-bg); }
@@ -116,6 +121,7 @@
     <span><i class="i-wplan"></i>作業予定</span>
     <span><i class="i-wdone"></i>作業実績</span>
     <span><i class="i-late"></i>予定日が過ぎた予定</span>
+    <span>☂ 降水確率（30%以上で表示・50%↑強調・80%↑濃い）</span>
   </div>
 
   <h2>今後の予定 / 未消化</h2>
@@ -132,6 +138,13 @@ const CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbzrKD24LhH_AK
 
 let PLANS = [], ACTUALS = [];
 let WORKPLANS = [], WORKDONE = [];
+let PROBS = {};   // 'YYYY-MM-DD' -> 降水確率%
+function rainMark(key){
+  const v = PROBS[key];
+  if(v==null || v<30) return '';
+  const cls = v>=80?'r3':(v>=50?'r2':'r1');
+  return '<span class="rain '+cls+'">\u2602'+v+'%</span>';
+}
 function isWork(p){ return p && p._type==='work'; }
 function planTitle(p){ return isWork(p) ? (p['カテゴリ']+'　'+p['作業内容']) : (p['品目']+'　'+p['農薬名']); }
 function act(p, base){ return base + (isWork(p) ? 'WorkPlan' : 'Plan'); }
@@ -182,6 +195,8 @@ async function loadAll(){
     ACTUALS   = (sp && sp.records) ? sp.records : [];
     WORKPLANS = ((wpl && wpl.plans) ? wpl.plans : []).map(function(p){ p._type='work'; return p; });
     WORKDONE  = (wk && wk.records) ? wk.records : [];
+    try{ const fc = await jsonp({ action:'forecast' }); PROBS = (fc && fc.probs) ? fc.probs : {}; }
+    catch(_){ PROBS = {}; }
   }catch(e){
     PLANS = []; ACTUALS = []; WORKPLANS = []; WORKDONE = [];
     toast('読み込みに失敗しました（GAS_URLを確認）');
@@ -227,7 +242,7 @@ function renderCalendar(){
     const cell = document.createElement('div');
     cell.className = 'cell' + (inMonth?'':' out') + (key===tStr?' today':'');
     const dow = d.getDay();
-    cell.innerHTML = '<div class="dnum'+(dow===0?' sun':(dow===6?' sat':''))+'">'+d.getDate()+'</div>';
+    cell.innerHTML = '<div class="drow"><span class="dnum'+(dow===0?' sun':(dow===6?' sat':''))+'">'+d.getDate()+'</span>'+rainMark(key)+'</div>';
 
     const plans = planByDay[key] || [], dones = doneByDay[key] || [];
     let shown = 0;
