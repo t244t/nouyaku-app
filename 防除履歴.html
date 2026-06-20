@@ -55,6 +55,10 @@
   td.num{ text-align:center; font-variant-numeric:tabular-nums; }
   td.j-over{ background:var(--over-bg); color:var(--over-ink); font-weight:700; }
   td.j-limit{ background:var(--limit-bg); color:var(--limit-ink); font-weight:700; }
+  td.photos{ white-space:nowrap; }
+  td.photos a{ display:inline-block; }
+  td.photos img{ width:34px; height:34px; object-fit:cover; border-radius:5px; border:1px solid var(--line); margin-right:3px; vertical-align:middle; }
+  td.photos .pmore{ font-size:.72rem; color:var(--sub); }
   .empty{ padding:26px; text-align:center; color:var(--sub); }
 
   @media print{
@@ -129,7 +133,7 @@
           <th>散布日</th><th>圃場</th><th>品目</th><th>農薬名</th>
           <th>登録番号</th><th>区分</th><th>対象</th><th>希釈</th>
           <th>使用量</th><th>使用回数<br>(今期/上限)</th><th>収穫前<br>日数</th>
-          <th>収穫可能日</th><th>メモ</th>
+          <th>収穫可能日</th><th>写真</th><th>メモ</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -157,6 +161,7 @@ const CROP_SLUG = {
 const COLS = ['散布日','圃場','品目','農薬名','登録番号','区分','対象','希釈','使用量','今期使用回数'];
 let CURRENT = [];
 const MASTER = {};   // slug -> { 番 -> [records] }  キャッシュ
+let PHOTOMAP = null; // 記録ID -> [photo...]  キャッシュ
 
 /* JSONPでGASを呼ぶ（CORS回避） */
 function jsonp(params){
@@ -253,6 +258,7 @@ async function enrich(rows){
 /* ===== 画面 ===== */
 async function init(){
   try{
+    await loadPhotos();
     const res = await jsonp({ action:'dfHistory' });
     if(!res.ok) throw new Error(res.error || '取得失敗');
     const all = res.records || [];
@@ -268,6 +274,32 @@ function distinct(rows, key){
   const set = {};
   rows.forEach(function(r){ const v = String(r[key]||'').trim(); if(v) set[v] = 1; });
   return Object.keys(set).sort();
+}
+
+/* 写真一覧を読み込み、記録ID→写真配列のマップを作る（1回だけ） */
+async function loadPhotos(){
+  if(PHOTOMAP) return PHOTOMAP;
+  PHOTOMAP = {};
+  try{
+    const res = await jsonp({ action:'listPhotos' });
+    (res && res.photos ? res.photos : []).forEach(function(p){
+      const k = String(p['記録ID']||''); if(!k) return;
+      (PHOTOMAP[k] = PHOTOMAP[k] || []).push(p);
+    });
+  }catch(e){ /* listPhotos未デプロイ等。写真列は空表示 */ }
+  return PHOTOMAP;
+}
+/* 記録IDの写真サムネイル（DriveIDからサムネurl、クリックで原寸） */
+function photoCell(recordId){
+  const list = (PHOTOMAP && PHOTOMAP[recordId]) ? PHOTOMAP[recordId] : [];
+  if(!list.length) return '<td class="num">—</td>';
+  let html = '<td class="photos">';
+  list.slice(0,3).forEach(function(p){
+    const tw = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(p['DriveID']) + '&sz=w120';
+    html += '<a href="'+esc(p['URL'])+'" target="_blank" rel="noopener"><img src="'+tw+'" alt="写真"></a>';
+  });
+  if(list.length>3) html += '<span class="pmore">+'+(list.length-3)+'</span>';
+  return html + '</td>';
 }
 function fillOptions(sel, items){
   items.forEach(function(v){ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
@@ -307,6 +339,7 @@ function render(rows){
       '<td class="num'+jcls+'">'+esc(used)+' / '+esc(lim)+'</td>' +
       '<td class="num">'+esc(phi)+'</td>' +
       '<td class="num">'+esc(r._harvestOk||'')+'</td>' +
+      photoCell(String(r.記録ID||'')) +
       td(r.メモ);
     tb.appendChild(tr);
   });
@@ -335,10 +368,11 @@ function updateMeta(count, overCnt){
 function downloadCsv(){
   if(!CURRENT.length){ alert('出力する記録がありません。'); return; }
   const head = ['散布日','圃場','品目','農薬名','登録番号','区分','対象','希釈','使用量',
-                '今期使用回数','使用回数上限','収穫前日数','収穫可能日','判定','メモ'];
+                '今期使用回数','使用回数上限','収穫前日数','収穫可能日','判定','写真URL','メモ'];
   const judgeJp = { over:'超過', limit:'上限到達', ok:'' };
   const lines = [ head.map(csvCell).join(',') ];
   CURRENT.forEach(function(r){
+    const ph = (PHOTOMAP && PHOTOMAP[String(r.記録ID||'')]) ? PHOTOMAP[String(r.記録ID||'')].map(function(x){return x['URL'];}).join(' ') : '';
     lines.push([
       r.散布日, r.圃場, r.品目, r.農薬名, r.登録番号, r.区分, r.対象, r.希釈, r.使用量,
       r.今期使用回数,
@@ -346,6 +380,7 @@ function downloadCsv(){
       (r._phi!=null ? r._phi : ''),
       r._harvestOk || '',
       judgeJp[r._judge] || '',
+      ph,
       r.メモ
     ].map(csvCell).join(','));
   });
