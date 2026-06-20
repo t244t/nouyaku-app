@@ -830,6 +830,7 @@ function saveField(){
 async function openWorkForm(){
   if(!fieldList.length) await loadFields(); // 圃場マップを開かずに使う場合の保険
   workCat=null;
+  pendingWorkPhotos=[];
   renderWorkForm();
   document.getElementById('fScrim').classList.add('show');
   document.getElementById('fSheet').classList.add('show');
@@ -856,6 +857,9 @@ function renderWorkForm(){
         '<div class="field"><label>作業日</label><input id="w_date" type="date" value="'+today+'"></div>'+
         '<div class="field"><label>時間（任意）</label><input id="w_hours" placeholder="例：1.5h"></div></div>'+
       '<div class="field"><label>メモ（任意）</label><input id="w_memo" placeholder="天候・作業の様子など"></div>'+
+      '<div class="field"><label>写真（任意・最大4枚／撮影またはアルバム）</label>'+
+        '<input id="wphotos" type="file" accept="image/*" multiple style="padding:9px 12px">'+
+        '<div id="wphotoPrev" class="photoprev"></div></div>'+
       '<button class="save" id="w_save">この内容で記録する</button>'+
       '<button class="save" id="w_plan" style="background:#fff;color:#1b5e20;border:1px solid #2e7d32;margin-top:8px">予定に追加（あとで実績化）</button>'+
       '<div class="note">この記録は圃場マップのポップアップ「直近の作業」にも表示されます。カテゴリーが<b>除草</b>の場合、除草済み／未処理の判定にも反映されます。</div>'+
@@ -870,6 +874,8 @@ function renderWorkForm(){
   });
   const sv=document.getElementById('w_save'); if(sv) sv.onclick=saveWork;
   const pv=document.getElementById('w_plan'); if(pv) pv.onclick=savePlanWork;
+  const wp=document.getElementById('wphotos'); if(wp) wp.onchange=onPickWorkPhotos;
+  repaintWorkPhotos();
 }
 function savePlanWork(){
   if(!workCat){ toast('カテゴリーを選んでください'); return; }
@@ -902,10 +908,51 @@ function saveWork(){
   const rec={line_user:CONFIG.LINE_USER, 圃場:valOf('w_field'), 作業日:valOf('w_date'),
     カテゴリ:workCat, 作業内容:content, 時間:valOf('w_hours'), メモ:valOf('w_memo')};
   const url=CONFIG.GAS_URL+'?action=addWork&'+new URLSearchParams(rec).toString();
+  const n=pendingWorkPhotos.length;
   fetch(url).then(r=>r.json()).then(async(j)=>{
-    if(j&&j.ok){ closeFieldSheet(); toast('作業を記録しました'); if(mapReady) await loadFieldStatus(); }
-    else toast('保存に失敗しました');
+    if(j&&j.ok){
+      if(n>0){ toast('作業を記録しました。写真'+n+'枚を保存中…'); await uploadWorkPhotos(j.id); toast('写真'+n+'枚を保存しました'); }
+      else toast('作業を記録しました');
+      closeFieldSheet();
+      if(mapReady) await loadFieldStatus();
+    }else toast('保存に失敗しました');
   }).catch(()=>toast('保存に失敗しました。通信を確認してください'));
+}
+
+/* ===== 作業報告の写真添付（散布側の仕組みを流用・別ID） ===== */
+let pendingWorkPhotos=[];
+async function onPickWorkPhotos(e){
+  const files=Array.from(e.target.files||[]);
+  for(const f of files){
+    if(pendingWorkPhotos.length>=4) break;
+    const dataUrl=await resizeImage(f,1600);
+    if(!dataUrl) continue;
+    pendingWorkPhotos.push({name:(f.name||('work'+Date.now()+'.jpg')),dataUrl:dataUrl,mime:'image/jpeg'});
+  }
+  e.target.value='';
+  repaintWorkPhotos();
+}
+function removeWorkPhoto(i){ pendingWorkPhotos.splice(i,1); repaintWorkPhotos(); }
+function repaintWorkPhotos(){
+  const prev=document.getElementById('wphotoPrev'); if(!prev) return;
+  prev.innerHTML='';
+  pendingWorkPhotos.forEach(function(p,idx){
+    const cell=document.createElement('div'); cell.className='pthumb';
+    cell.innerHTML='<img src="'+p.dataUrl+'"><button type="button" class="rm" data-i="'+idx+'">×</button>';
+    cell.querySelector('.rm').onclick=function(){ removeWorkPhoto(Number(this.dataset.i)); };
+    prev.appendChild(cell);
+  });
+}
+async function uploadWorkPhotos(workId){
+  if(!pendingWorkPhotos.length||!CONFIG.GAS_URL) return;
+  for(const ph of pendingWorkPhotos){
+    try{
+      await fetch(CONFIG.GAS_URL,{ method:'POST',
+        body:JSON.stringify({action:'uploadPhoto',記録ID:workId,種別:'作業',
+          ファイル名:ph.name,mimeType:ph.mime,dataB64:ph.dataUrl}) });
+    }catch(err){ /* 応答は読まない設計。保存可否はlistPhotosで確認 */ }
+  }
+  pendingWorkPhotos=[];
 }
 
 document.getElementById('fScrim').onclick=closeFieldSheet;
