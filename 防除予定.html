@@ -41,6 +41,9 @@
   .chip.plan{ border:1px solid var(--plan); color:var(--plan); background:var(--plan-bg); }
   .chip.plan.late{ border-color:var(--late); color:var(--late); background:var(--late-bg); }
   .chip.done{ background:var(--done); color:#fff; cursor:default; }
+  .chip.wplan{ border:1px solid #8d6e63; color:#6d4c41; background:#efe9e6; }
+  .chip.wplan.late{ border-color:var(--late); color:var(--late); background:var(--late-bg); }
+  .chip.wdone{ background:#8d6e63; color:#fff; cursor:default; }
   .more{ font-size:.6rem; color:var(--sub); margin-top:1px; }
 
   .legend{ font-size:.74rem; color:var(--sub); margin:10px 2px; display:flex; gap:14px; flex-wrap:wrap; }
@@ -48,6 +51,8 @@
   .legend .i-plan{ border:1px solid var(--plan); background:var(--plan-bg); }
   .legend .i-done{ background:var(--done); }
   .legend .i-late{ border:1px solid var(--late); background:var(--late-bg); }
+  .legend .i-wplan{ border:1px solid #8d6e63; background:#efe9e6; }
+  .legend .i-wdone{ background:#8d6e63; }
 
   h2{ font-size:.98rem; color:var(--green-d); margin:18px 2px 8px; }
   .pcard{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
@@ -86,8 +91,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>防除予定カレンダー</h1>
-  <p class="lead">予定（枠）と実績（塗り）を重ねて表示します。雨などのときは延期・日付変更・中止ができ、撒いたら実績化で散布記録になります。</p>
+  <h1>作業・防除カレンダー</h1>
+  <p class="lead">散布予定・作業予定（枠）と実績（塗り）を重ねて表示します。雨などのときは延期・日付変更・中止ができ、終わったら実績化で記録になります。</p>
 
   <div class="calhead">
     <button class="navbtn" id="prev">‹</button>
@@ -106,8 +111,10 @@
   </div>
 
   <div class="legend">
-    <span><i class="i-plan"></i>予定</span>
-    <span><i class="i-done"></i>実績（散布済）</span>
+    <span><i class="i-plan"></i>散布予定</span>
+    <span><i class="i-done"></i>散布実績</span>
+    <span><i class="i-wplan"></i>作業予定</span>
+    <span><i class="i-wdone"></i>作業実績</span>
     <span><i class="i-late"></i>予定日が過ぎた予定</span>
   </div>
 
@@ -124,6 +131,10 @@
 const CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec' };
 
 let PLANS = [], ACTUALS = [];
+let WORKPLANS = [], WORKDONE = [];
+function isWork(p){ return p && p._type==='work'; }
+function planTitle(p){ return isWork(p) ? (p['カテゴリ']+'　'+p['作業内容']) : (p['品目']+'　'+p['農薬名']); }
+function act(p, base){ return base + (isWork(p) ? 'WorkPlan' : 'Plan'); }
 const today = new Date(); today.setHours(0,0,0,0);
 const state = { y: today.getFullYear(), m: today.getMonth() };  // m:0始まり
 const $ = function(id){ return document.getElementById(id); };
@@ -161,14 +172,18 @@ let tg; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.
 /* ===== データ読み込み ===== */
 async function loadAll(){
   try{
-    const [pl, sp] = await Promise.all([
+    const [pl, sp, wpl, wk] = await Promise.all([
       jsonp({ action:'listPlan' }),
-      jsonp({ action:'listSpray', limit:500 })
+      jsonp({ action:'listSpray', limit:500 }),
+      jsonp({ action:'listWorkPlan' }),
+      jsonp({ action:'listWork', limit:500 })
     ]);
-    PLANS   = (pl && pl.plans)   ? pl.plans   : [];
-    ACTUALS = (sp && sp.records) ? sp.records : [];
+    PLANS     = ((pl && pl.plans) ? pl.plans : []).map(function(p){ p._type='spray'; return p; });
+    ACTUALS   = (sp && sp.records) ? sp.records : [];
+    WORKPLANS = ((wpl && wpl.plans) ? wpl.plans : []).map(function(p){ p._type='work'; return p; });
+    WORKDONE  = (wk && wk.records) ? wk.records : [];
   }catch(e){
-    PLANS = []; ACTUALS = [];
+    PLANS = []; ACTUALS = []; WORKPLANS = []; WORKDONE = [];
     toast('読み込みに失敗しました（GAS_URLを確認）');
   }
   renderCalendar(); renderList();
@@ -182,15 +197,26 @@ function renderCalendar(){
   const start = new Date(first); start.setDate(1 - first.getDay()); // 週頭(日)に合わせる
   const tStr = todayStr();
 
-  // 当月の予定（予定状態のみ）と実績を日付キーでまとめる
+  // 当月の予定（予定状態のみ）と実績を日付キーでまとめる（散布＋作業）
   const planByDay = {}, doneByDay = {};
   PLANS.forEach(function(p){
     if(String(p['状態']) !== '予定') return;
     const k = ymd(p['予定日']); if(!k) return;
     (planByDay[k] = planByDay[k] || []).push(p);
   });
+  WORKPLANS.forEach(function(p){
+    if(String(p['状態']) !== '予定') return;
+    const k = ymd(p['予定日']); if(!k) return;
+    (planByDay[k] = planByDay[k] || []).push(p);
+  });
   ACTUALS.forEach(function(r){
     const k = ymd(r['散布日']); if(!k) return;
+    r._type='spray';
+    (doneByDay[k] = doneByDay[k] || []).push(r);
+  });
+  WORKDONE.forEach(function(r){
+    const k = ymd(r['作業日']); if(!k) return;
+    r._type='work';
     (doneByDay[k] = doneByDay[k] || []).push(r);
   });
 
@@ -208,17 +234,19 @@ function renderCalendar(){
     plans.forEach(function(p){
       if(shown>=3) return; shown++;
       const late = key < tStr;
+      const work = (p._type==='work');
       const c = document.createElement('div');
-      c.className = 'chip plan' + (late?' late':'');
-      c.textContent = p['品目'] + ' ' + shortName(p['農薬名']);
+      c.className = 'chip ' + (work?'wplan':'plan') + (late?' late':'');
+      c.textContent = work ? (p['カテゴリ']+' '+shortName(p['作業内容'])) : (p['品目']+' '+shortName(p['農薬名']));
       c.onclick = function(){ openActions(p); };
       cell.appendChild(c);
     });
     dones.forEach(function(r){
       if(shown>=3) return; shown++;
+      const work = (r._type==='work');
       const c = document.createElement('div');
-      c.className = 'chip done';
-      c.textContent = r['品目'] + ' ' + shortName(r['農薬名']);
+      c.className = 'chip ' + (work?'wdone':'done');
+      c.textContent = work ? (r['カテゴリ']+' '+shortName(r['作業内容'])) : (r['品目']+' '+shortName(r['農薬名']));
       cell.appendChild(c);
     });
     const extra = (plans.length + dones.length) - shown;
@@ -230,19 +258,23 @@ function renderCalendar(){
 /* ===== 今後の予定リスト ===== */
 function renderList(){
   const tStr = todayStr();
-  const items = PLANS.filter(function(p){ return String(p['状態'])==='予定'; })
+  const items = PLANS.concat(WORKPLANS).filter(function(p){ return String(p['状態'])==='予定'; })
     .sort(function(a,b){ return ymd(a['予定日']) < ymd(b['予定日']) ? -1 : 1; });
   const list = $('list');
-  if(!items.length){ list.innerHTML = '<div class="empty">予定はありません。農薬の記録画面から「予定に追加」できます。</div>'; return; }
+  if(!items.length){ list.innerHTML = '<div class="empty">予定はありません。農薬の記録画面や作業報告から「予定に追加」できます。</div>'; return; }
   list.innerHTML = '';
   items.forEach(function(p){
+    const work = (p._type==='work');
     const late = ymd(p['予定日']) < tStr;
     const card = document.createElement('div');
     card.className = 'pcard' + (late?' late':'');
+    const main = work ? (esc(p['カテゴリ'])+'　'+esc(p['作業内容'])) : (esc(p['品目'])+'　'+esc(p['農薬名']));
+    const sub  = work ? esc(p['圃場'])
+                      : (esc(p['圃場'])+'　/　'+esc(p['区分'])+'　/　対象：'+esc(p['対象']||'—')+'　/　'+esc(p['希釈']||''));
     card.innerHTML =
       '<div class="pc-date">'+esc(p['予定日'])+(late?'<span class="late-tag">● 予定日超過</span>':'')+'</div>'+
-      '<div class="pc-main">'+esc(p['品目'])+'　'+esc(p['農薬名'])+'</div>'+
-      '<div class="pc-sub">'+esc(p['圃場'])+'　/　'+esc(p['区分'])+'　/　対象：'+esc(p['対象']||'—')+'　/　'+esc(p['希釈']||'')+'</div>';
+      '<div class="pc-main">'+main+'</div>'+
+      '<div class="pc-sub">'+sub+'</div>';
     const btns = document.createElement('div'); btns.className = 'pc-btns';
     btns.appendChild(mkBtn('実績化','b-do',function(){ openFulfill(p); }));
     btns.appendChild(mkBtn('＋1日','b-min',function(){ doPostpone(p,1); }));
@@ -263,8 +295,8 @@ $('scrim').onclick = closeModal;
 /* チップタップ → 操作メニュー */
 function openActions(p){
   showModal(
-    '<h3>'+esc(p['品目'])+'　'+esc(p['農薬名'])+'</h3>'+
-    '<div class="info">'+esc(p['予定日'])+'　/　'+esc(p['圃場'])+'　/　'+esc(p['区分'])+'</div>'+
+    '<h3>'+esc(planTitle(p))+'</h3>'+
+    '<div class="info">'+esc(p['予定日'])+'　/　'+esc(p['圃場'])+(isWork(p)?'':'　/　'+esc(p['区分']))+'</div>'+
     '<div class="mbtns" style="flex-direction:column">'+
       '<button class="m-ok" id="a-do">実績化する</button>'+
       '<button class="m-cancel" id="a-p1">＋1日 延期</button>'+
@@ -281,8 +313,27 @@ function openActions(p){
   $('a-close').onclick= closeModal;
 }
 
-/* 実績化：使用量・実際の散布日・メモを入力して確定 */
+/* 実績化：散布は使用量、作業は時間を入力して確定 */
 function openFulfill(p){
+  if(isWork(p)){
+    showModal(
+      '<h3>実績化（作業報告へ）</h3>'+
+      '<div class="info">'+esc(p['カテゴリ'])+'　'+esc(p['作業内容'])+'　/　'+esc(p['圃場'])+'</div>'+
+      '<label>実際の作業日</label><input type="date" id="m-date" value="'+esc(ymd(p['予定日']))+'">'+
+      '<label>時間（任意）</label><input id="m-amt" placeholder="例：1.5h">'+
+      '<label>メモ（任意）</label><input id="m-memo" value="'+esc(p['メモ']||'')+'" placeholder="天候・作業の様子など">'+
+      '<div class="mbtns"><button class="m-cancel" id="m-no">やめる</button><button class="m-ok" id="m-yes">記録する</button></div>');
+    $('m-no').onclick = closeModal;
+    $('m-yes').onclick = async function(){
+      try{
+        const res = await jsonp({ action:'fulfillWorkPlan', 予定ID:p['予定ID'],
+          作業日:$('m-date').value, 時間:$('m-amt').value, メモ:$('m-memo').value });
+        if(!res.ok) throw new Error(res.error||'失敗');
+        closeModal(); toast('作業報告に登録しました'); await loadAll();
+      }catch(e){ toast('実績化に失敗：'+e.message); }
+    };
+    return;
+  }
   showModal(
     '<h3>実績化（散布記録へ）</h3>'+
     '<div class="info">'+esc(p['品目'])+'　'+esc(p['農薬名'])+'　/　'+esc(p['圃場'])+'</div>'+
@@ -305,14 +356,14 @@ function openFulfill(p){
 function openDate(p){
   showModal(
     '<h3>予定日を変更</h3>'+
-    '<div class="info">'+esc(p['品目'])+'　'+esc(p['農薬名'])+'</div>'+
+    '<div class="info">'+esc(planTitle(p))+'</div>'+
     '<label>新しい予定日</label><input type="date" id="m-nd" value="'+esc(ymd(p['予定日']))+'">'+
     '<div class="mbtns"><button class="m-cancel" id="m-no">やめる</button><button class="m-ok" id="m-yes">変更する</button></div>');
   $('m-no').onclick = closeModal;
   $('m-yes').onclick = async function(){
     const nd = $('m-nd').value; if(!nd){ toast('日付を選んでください'); return; }
     try{
-      const res = await jsonp({ action:'postponePlan', 予定ID:p['予定ID'], 予定日:nd });
+      const res = await jsonp({ action:act(p,'postpone'), 予定ID:p['予定ID'], 予定日:nd });
       if(!res.ok) throw new Error(res.error||'失敗');
       closeModal(); toast('予定日を変更しました'); await loadAll();
     }catch(e){ toast('変更に失敗：'+e.message); }
@@ -321,15 +372,15 @@ function openDate(p){
 
 async function doPostpone(p, days){
   try{
-    const res = await jsonp({ action:'postponePlan', 予定ID:p['予定ID'], days:days });
+    const res = await jsonp({ action:act(p,'postpone'), 予定ID:p['予定ID'], days:days });
     if(!res.ok) throw new Error(res.error||'失敗');
     closeModal(); toast(days+'日 延期しました（→ '+res.予定日+'）'); await loadAll();
   }catch(e){ toast('延期に失敗：'+e.message); }
 }
 async function doCancel(p){
-  if(!confirm('この予定を中止にしますか？\n'+p['品目']+' '+p['農薬名']+'（'+p['予定日']+'）')) return;
+  if(!confirm('この予定を中止にしますか？\n'+planTitle(p)+'（'+p['予定日']+'）')) return;
   try{
-    const res = await jsonp({ action:'cancelPlan', 予定ID:p['予定ID'] });
+    const res = await jsonp({ action:act(p,'cancel'), 予定ID:p['予定ID'] });
     if(!res.ok) throw new Error(res.error||'失敗');
     closeModal(); toast('中止にしました'); await loadAll();
   }catch(e){ toast('中止に失敗：'+e.message); }
