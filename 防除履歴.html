@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>防除履歴｜農・みのり 農薬管理</title>
+<style>
+  :root{
+    --green:#2e7d32; --green-d:#1b5e20; --line:#d7ddd2;
+    --ink:#222; --sub:#667;
+    --over-bg:#fde8e8; --over-ink:#c62828;
+    --limit-bg:#fff4e0; --limit-ink:#e07a00;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; padding:16px;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    color:var(--ink); background:#f5f7f2; -webkit-text-size-adjust:100%;
+  }
+  .wrap{ max-width:1100px; margin:0 auto; }
+  h1{ font-size:1.25rem; color:var(--green-d); margin:0 0 4px; }
+  .lead{ color:var(--sub); font-size:.85rem; margin:0 0 14px; }
+
+  .controls{
+    background:#fff; border:1px solid var(--line); border-radius:12px;
+    padding:14px; margin-bottom:14px;
+    display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px 12px;
+  }
+  .controls label{ display:block; font-size:.78rem; color:var(--sub); margin-bottom:3px; }
+  .controls select, .controls input{
+    width:100%; padding:8px 9px; border:1px solid #c6cdbf; border-radius:8px;
+    font-size:.92rem; background:#fff;
+  }
+  .btnrow{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; }
+  button{
+    appearance:none; border:0; border-radius:9px; padding:10px 16px;
+    font-size:.92rem; font-weight:600; cursor:pointer;
+  }
+  .b-go{ background:var(--green); color:#fff; }
+  .b-go:hover{ background:var(--green-d); }
+  .b-ghost{ background:#fff; color:var(--green-d); border:1px solid var(--green); }
+  .b-ghost:hover{ background:#eef5ee; }
+
+  .meta{ display:none; }
+  .status{ color:var(--sub); font-size:.85rem; margin:6px 2px 10px; }
+  .legend{ font-size:.78rem; color:var(--sub); margin:0 2px 10px; }
+  .legend b.over{ color:var(--over-ink); }
+  .legend b.limit{ color:var(--limit-ink); }
+
+  .tablewrap{ overflow-x:auto; background:#fff; border:1px solid var(--line); border-radius:12px; }
+  table{ border-collapse:collapse; width:100%; font-size:.84rem; }
+  th, td{ border:1px solid var(--line); padding:7px 9px; text-align:left; white-space:nowrap; }
+  thead th{ background:#eef3ea; color:var(--green-d); position:sticky; top:0; }
+  tbody tr:nth-child(even){ background:#fafbf8; }
+  td.num{ text-align:center; font-variant-numeric:tabular-nums; }
+  td.j-over{ background:var(--over-bg); color:var(--over-ink); font-weight:700; }
+  td.j-limit{ background:var(--limit-bg); color:var(--limit-ink); font-weight:700; }
+  .empty{ padding:26px; text-align:center; color:var(--sub); }
+
+  @media print{
+    body{ background:#fff; padding:0; }
+    .controls, .btnrow, .status, .legend, .lead{ display:none !important; }
+    .meta{ display:block; margin-bottom:10px; }
+    .meta h2{ font-size:1.15rem; margin:0 0 6px; }
+    .meta .row{ font-size:.82rem; color:#000; }
+    .tablewrap{ border:0; border-radius:0; overflow:visible; }
+    table{ font-size:.68rem; }
+    thead th{ position:static; }
+    th, td{ white-space:normal; }
+    td.j-over{ background:#fde8e8 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    td.j-limit{ background:#fff4e0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>防除履歴（農薬使用記録）</h1>
+  <p class="lead">作物・圃場・期間でしぼり込み、画面表示／印刷（PDF）／CSV出力ができます。使用回数の超過警告と、登録情報からの収穫可能日を自動表示します。</p>
+
+  <div class="controls">
+    <div>
+      <label>品目（作物）</label>
+      <select id="f-hinmoku"><option value="">すべて</option></select>
+    </div>
+    <div>
+      <label>圃場</label>
+      <select id="f-hojo"><option value="">すべて</option></select>
+    </div>
+    <div>
+      <label>区分</label>
+      <select id="f-kubun">
+        <option value="">すべて</option>
+        <option value="消毒">消毒（殺虫・殺菌）</option>
+        <option value="除草">除草</option>
+      </select>
+    </div>
+    <div>
+      <label>期間（自）</label>
+      <input type="date" id="f-from">
+    </div>
+    <div>
+      <label>期間（至）</label>
+      <input type="date" id="f-to">
+    </div>
+  </div>
+
+  <div class="btnrow">
+    <button class="b-go"    id="btn-go">表示する</button>
+    <button class="b-ghost" id="btn-print">印刷 / PDF</button>
+    <button class="b-ghost" id="btn-csv">CSVダウンロード</button>
+  </div>
+
+  <div class="status" id="status">読み込み中…</div>
+  <div class="legend">
+    使用回数の色分け：<b class="over">赤＝上限超過</b>　<b class="limit">橙＝上限に到達（次回が超過）</b>。
+    収穫可能日＝散布日＋登録の収穫前日数（この日以降なら収穫可）。
+  </div>
+
+  <div class="meta" id="meta">
+    <h2>防除実施記録</h2>
+    <div class="row">生産者：農・みのり　／　出力日：<span id="m-date"></span></div>
+    <div class="row" id="m-cond"></div>
+  </div>
+
+  <div class="tablewrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th>散布日</th><th>圃場</th><th>品目</th><th>農薬名</th>
+          <th>登録番号</th><th>区分</th><th>対象</th><th>希釈</th>
+          <th>使用量</th><th>使用回数<br>(今期/上限)</th><th>収穫前<br>日数</th>
+          <th>収穫可能日</th><th>メモ</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none;">該当する記録がありません。</div>
+  </div>
+</div>
+
+<script>
+/* ===== 設定 ===== */
+const CONFIG = {
+  GAS_URL:   'https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec',
+  DATA_BASE: 'https://t244t.github.io/nouyaku-app/data/'   // 農薬マスタJSONの置き場（既存アプリと同じ）
+};
+
+/* 品目名 → スラッグ（既存 index.html の CROPS と同じ） */
+const CROP_SLUG = {
+  'お米':'kome','なす':'nasu','きゅうり':'kyuri','キャベツ':'kyabetsu',
+  'じゃがいも':'jagaimo','スナップエンドウ':'endou','さつまいも':'satsumaimo','オクラ':'okura',
+  'トウモロコシ':'corn','ピーマン':'piman','トマト':'tomato','落花生':'rakkasei',
+  'レタス':'retasu','ししとう':'shishito','ホウレン草':'horenso','にんにく':'ninniku',
+  '人参':'ninjin','玉ねぎ':'tamanegi'
+};
+
+const COLS = ['散布日','圃場','品目','農薬名','登録番号','区分','対象','希釈','使用量','今期使用回数'];
+let CURRENT = [];
+const MASTER = {};   // slug -> { 番 -> [records] }  キャッシュ
+
+/* JSONPでGASを呼ぶ（CORS回避） */
+function jsonp(params){
+  return new Promise(function(resolve, reject){
+    const cb = 'cb' + Date.now() + Math.floor(Math.random()*1e4);
+    const q = Object.keys(params)
+      .filter(function(k){ return params[k] !== '' && params[k] != null; })
+      .map(function(k){ return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]); })
+      .join('&');
+    const s = document.createElement('script');
+    const timer = setTimeout(function(){ cleanup(); reject(new Error('タイムアウト')); }, 20000);
+    function cleanup(){ clearTimeout(timer); delete window[cb]; s.remove(); }
+    window[cb] = function(data){ cleanup(); resolve(data); };
+    s.onerror = function(){ cleanup(); reject(new Error('通信エラー')); };
+    s.src = CONFIG.GAS_URL + '?' + q + (q?'&':'') + 'callback=' + cb;
+    document.body.appendChild(s);
+  });
+}
+const $ = function(id){ return document.getElementById(id); };
+
+/* ===== 農薬マスタの読み込みと突き合わせ ===== */
+async function loadMaster(slug){
+  if(MASTER[slug]) return MASTER[slug];
+  try{
+    const r = await fetch(CONFIG.DATA_BASE + slug + '.json');
+    if(!r.ok) throw 0;
+    const d = await r.json();
+    const map = {};
+    (d.農薬 || []).forEach(function(rec){
+      const k = String(rec.番 || '');
+      if(!k) return;
+      (map[k] = map[k] || []).push(rec);
+    });
+    MASTER[slug] = map;
+  }catch(e){
+    MASTER[slug] = {};   // 失敗してもnullにせずキャッシュ（再取得を防ぐ）
+  }
+  return MASTER[slug];
+}
+
+/* 登録番号＋対象でマスタ行を引く（対象一致を優先、なければ先頭） */
+function lookupMaster(slug, regno, target){
+  const map = MASTER[slug]; if(!map) return null;
+  const list = map[String(regno||'')]; if(!list || !list.length) return null;
+  if(target){
+    const hit = list.find(function(x){ return String(x.虫||'') === String(target); });
+    if(hit) return hit;
+  }
+  return list[0];
+}
+
+/* 「3回以内」「1回」→ 数値（上限）。「-」「」→ null */
+function parseLimit(s){ const m = String(s||'').match(/(\d+)\s*回/); return m ? +m[1] : null; }
+
+/* 使用時期 → 収穫前日数。「収穫前日まで」=1、「収穫(開始)?n日前」=n、日数なし=null */
+function parsePhi(s){
+  s = String(s||'');
+  let m = s.match(/収穫開始\s*(\d+)\s*日前/); if(m) return +m[1];
+  m = s.match(/収穫\s*(\d+)\s*日前/);        if(m) return +m[1];
+  if(/収穫前日/.test(s)) return 1;
+  return null;
+}
+
+/* 'YYYY-MM-DD'/'2026/6/16' を Date に */
+function toDate(v){
+  const s = String(v).replace(/[年月]/g,'-').replace(/日/g,'').replace(/\//g,'-').trim();
+  const m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  return m ? new Date(+m[1], +m[2]-1, +m[3]) : null;
+}
+function fmtMD(d){ return d ? (d.getMonth()+1) + '/' + d.getDate() : ''; }
+
+/* 各行にマスタ情報を付与（上限・収穫前日数・収穫可能日・判定） */
+async function enrich(rows){
+  const need = {};
+  rows.forEach(function(r){ const s = CROP_SLUG[r.品目]; if(s) need[s] = 1; });
+  await Promise.all(Object.keys(need).map(loadMaster));
+  rows.forEach(function(r){
+    const slug = CROP_SLUG[r.品目];
+    const rec  = slug ? lookupMaster(slug, r.登録番号, r.対象) : null;
+    r._limit = rec ? parseLimit(rec.回) : null;
+    r._phi   = rec ? parsePhi(rec.期)   : null;
+    const used = Number(r.今期使用回数) || 0;
+    // 判定
+    if(r._limit != null && used > r._limit)      r._judge = 'over';
+    else if(r._limit != null && used === r._limit) r._judge = 'limit';
+    else r._judge = 'ok';
+    // 収穫可能日 = 散布日 + 収穫前日数
+    const d = toDate(r.散布日);
+    if(d != null && r._phi != null){ d.setDate(d.getDate() + r._phi); r._harvestOk = fmtMD(d); }
+    else r._harvestOk = '';
+  });
+}
+
+/* ===== 画面 ===== */
+async function init(){
+  try{
+    const res = await jsonp({ action:'dfHistory' });
+    if(!res.ok) throw new Error(res.error || '取得失敗');
+    const all = res.records || [];
+    fillOptions($('f-hinmoku'), distinct(all, '品目'));
+    fillOptions($('f-hojo'),    distinct(all, '圃場'));
+    await enrich(all);
+    render(all);
+  }catch(err){
+    $('status').textContent = '読み込みエラー：' + err.message + '（GAS_URL の設定を確認してください）';
+  }
+}
+function distinct(rows, key){
+  const set = {};
+  rows.forEach(function(r){ const v = String(r[key]||'').trim(); if(v) set[v] = 1; });
+  return Object.keys(set).sort();
+}
+function fillOptions(sel, items){
+  items.forEach(function(v){ const o=document.createElement('option'); o.value=v; o.textContent=v; sel.appendChild(o); });
+}
+
+async function search(){
+  $('status').textContent = '検索中…';
+  try{
+    const res = await jsonp({
+      action:'dfHistory',
+      品目:$('f-hinmoku').value, 圃場:$('f-hojo').value, 区分:$('f-kubun').value,
+      from:$('f-from').value, to:$('f-to').value
+    });
+    if(!res.ok) throw new Error(res.error || '取得失敗');
+    const rows = res.records || [];
+    await enrich(rows);
+    render(rows);
+  }catch(err){
+    $('status').textContent = '検索エラー：' + err.message;
+  }
+}
+
+function render(rows){
+  CURRENT = rows;
+  const tb = $('tbody'); tb.innerHTML = '';
+  let overCnt = 0;
+  rows.forEach(function(r){
+    if(r._judge === 'over') overCnt++;
+    const used = (r.今期使用回数 != null ? r.今期使用回数 : '');
+    const lim  = (r._limit != null ? r._limit + '回' : '—');
+    const jcls = r._judge === 'over' ? ' j-over' : (r._judge === 'limit' ? ' j-limit' : '');
+    const phi  = (r._phi != null ? r._phi + '日前' : '—');
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      td(r.散布日) + td(r.圃場) + td(r.品目) + td(r.農薬名) +
+      td(r.登録番号) + td(r.区分) + td(r.対象) + td(r.希釈) + td(r.使用量) +
+      '<td class="num'+jcls+'">'+esc(used)+' / '+esc(lim)+'</td>' +
+      '<td class="num">'+esc(phi)+'</td>' +
+      '<td class="num">'+esc(r._harvestOk||'')+'</td>' +
+      td(r.メモ);
+    tb.appendChild(tr);
+  });
+  $('empty').style.display = rows.length ? 'none' : 'block';
+  $('tbl').style.display   = rows.length ? '' : 'none';
+  $('status').textContent  = rows.length + ' 件' + (overCnt ? '（うち使用回数超過 ' + overCnt + ' 件）' : '');
+  updateMeta(rows.length, overCnt);
+}
+function esc(v){ return String(v==null?'':v).replace(/[&<>]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;'})[c];}); }
+function td(v){ return '<td>' + esc(v) + '</td>'; }
+
+function updateMeta(count, overCnt){
+  const d = new Date();
+  $('m-date').textContent = d.getFullYear()+'年'+(d.getMonth()+1)+'月'+d.getDate()+'日';
+  const cond = [];
+  if($('f-hinmoku').value) cond.push('品目：'+$('f-hinmoku').value);
+  if($('f-hojo').value)    cond.push('圃場：'+$('f-hojo').value);
+  if($('f-kubun').value)   cond.push('区分：'+$('f-kubun').value);
+  if($('f-from').value || $('f-to').value) cond.push('期間：'+($('f-from').value||'')+' 〜 '+($('f-to').value||''));
+  cond.push('件数：'+count+' 件');
+  if(overCnt) cond.push('使用回数超過：'+overCnt+' 件');
+  $('m-cond').textContent = cond.join('　／　');
+}
+
+/* CSV（UTF-8+BOM） */
+function downloadCsv(){
+  if(!CURRENT.length){ alert('出力する記録がありません。'); return; }
+  const head = ['散布日','圃場','品目','農薬名','登録番号','区分','対象','希釈','使用量',
+                '今期使用回数','使用回数上限','収穫前日数','収穫可能日','判定','メモ'];
+  const judgeJp = { over:'超過', limit:'上限到達', ok:'' };
+  const lines = [ head.map(csvCell).join(',') ];
+  CURRENT.forEach(function(r){
+    lines.push([
+      r.散布日, r.圃場, r.品目, r.農薬名, r.登録番号, r.区分, r.対象, r.希釈, r.使用量,
+      r.今期使用回数,
+      (r._limit!=null ? r._limit+'回' : ''),
+      (r._phi!=null ? r._phi : ''),
+      r._harvestOk || '',
+      judgeJp[r._judge] || '',
+      r.メモ
+    ].map(csvCell).join(','));
+  });
+  const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type:'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const d = new Date();
+  const ymd = d.getFullYear()+('0'+(d.getMonth()+1)).slice(-2)+('0'+d.getDate()).slice(-2);
+  a.href = url; a.download = '防除履歴_'+ymd+'.csv';
+  document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+function csvCell(v){
+  const s = String(v==null?'':v);
+  return /[",\r\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+
+$('btn-go').addEventListener('click', search);
+$('btn-print').addEventListener('click', function(){ updateMeta(CURRENT.length); window.print(); });
+$('btn-csv').addEventListener('click', downloadCsv);
+
+init();
+</script>
+</body>
+</html>
