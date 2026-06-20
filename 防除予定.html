@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>防除予定カレンダー｜農・みのり 農薬管理</title>
+<style>
+  :root{
+    --green:#2e7d32; --green-d:#1b5e20; --line:#d7ddd2; --ink:#222; --sub:#667;
+    --plan:#2e7d32; --plan-bg:#eef5ee; --done:#1565c0; --done-bg:#e8f0fb;
+    --late:#c62828; --late-bg:#fdecec;
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; padding:14px;
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    color:var(--ink); background:#f5f7f2; -webkit-text-size-adjust:100%; }
+  .wrap{ max-width:760px; margin:0 auto; }
+  h1{ font-size:1.2rem; color:var(--green-d); margin:0 0 2px; }
+  .lead{ color:var(--sub); font-size:.82rem; margin:0 0 12px; }
+
+  .calhead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .calhead .ym{ font-size:1.05rem; font-weight:700; color:var(--green-d); }
+  .navbtn{ background:#fff; border:1px solid var(--green); color:var(--green-d);
+    border-radius:8px; padding:6px 12px; font-size:1rem; cursor:pointer; }
+  .today-link{ font-size:.8rem; color:var(--green-d); background:none; border:0; cursor:pointer; text-decoration:underline; }
+
+  .cal{ background:#fff; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .dow{ display:grid; grid-template-columns:repeat(7,1fr); background:#eef3ea; }
+  .dow div{ text-align:center; font-size:.72rem; color:var(--green-d); padding:5px 0; font-weight:700; }
+  .dow div.sun{ color:#c0392b; } .dow div.sat{ color:#2266bb; }
+  .grid{ display:grid; grid-template-columns:repeat(7,1fr); }
+  .cell{ min-height:64px; border-top:1px solid var(--line); border-left:1px solid var(--line);
+    padding:3px; position:relative; }
+  .cell:nth-child(7n+1){ border-left:0; }
+  .cell.out{ background:#fafbf8; }
+  .cell.today{ background:#fffdf3; box-shadow:inset 0 0 0 2px #f0c14b; }
+  .dnum{ font-size:.7rem; color:var(--sub); }
+  .dnum.sun{ color:#c0392b; } .dnum.sat{ color:#2266bb; }
+  .chip{ display:block; font-size:.64rem; line-height:1.25; margin-top:2px; padding:2px 4px;
+    border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
+  .chip.plan{ border:1px solid var(--plan); color:var(--plan); background:var(--plan-bg); }
+  .chip.plan.late{ border-color:var(--late); color:var(--late); background:var(--late-bg); }
+  .chip.done{ background:var(--done); color:#fff; cursor:default; }
+  .more{ font-size:.6rem; color:var(--sub); margin-top:1px; }
+
+  .legend{ font-size:.74rem; color:var(--sub); margin:10px 2px; display:flex; gap:14px; flex-wrap:wrap; }
+  .legend i{ display:inline-block; width:11px; height:11px; border-radius:3px; vertical-align:-1px; margin-right:4px; }
+  .legend .i-plan{ border:1px solid var(--plan); background:var(--plan-bg); }
+  .legend .i-done{ background:var(--done); }
+  .legend .i-late{ border:1px solid var(--late); background:var(--late-bg); }
+
+  h2{ font-size:.98rem; color:var(--green-d); margin:18px 2px 8px; }
+  .pcard{ background:#fff; border:1px solid var(--line); border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+  .pcard.late{ border-color:var(--late); }
+  .pc-date{ font-weight:700; font-size:.9rem; }
+  .pc-date .late-tag{ color:var(--late); font-size:.72rem; margin-left:6px; }
+  .pc-main{ font-size:.86rem; margin:2px 0; }
+  .pc-sub{ font-size:.76rem; color:var(--sub); }
+  .pc-btns{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .pc-btns button{ border:0; border-radius:7px; padding:7px 11px; font-size:.8rem; font-weight:600; cursor:pointer; }
+  .b-do{ background:var(--green); color:#fff; }
+  .b-min{ background:#fff; color:var(--green-d); border:1px solid var(--green) !important; }
+  .b-x{ background:#fff; color:var(--late); border:1px solid var(--late) !important; }
+  .empty{ color:var(--sub); font-size:.84rem; padding:8px 2px; }
+
+  /* モーダル */
+  .scrim{ position:fixed; inset:0; background:rgba(0,0,0,.4); display:none; z-index:50; }
+  .scrim.show{ display:block; }
+  .modal{ position:fixed; left:50%; bottom:0; transform:translateX(-50%);
+    width:100%; max-width:480px; background:#fff; border-radius:14px 14px 0 0;
+    padding:16px; z-index:60; display:none; }
+  .modal.show{ display:block; }
+  .modal h3{ margin:0 0 4px; font-size:1rem; color:var(--green-d); }
+  .modal .info{ font-size:.82rem; color:var(--sub); margin-bottom:10px; }
+  .modal label{ display:block; font-size:.78rem; color:var(--sub); margin:8px 0 3px; }
+  .modal input{ width:100%; padding:9px 10px; border:1px solid #c6cdbf; border-radius:8px; font-size:.95rem; }
+  .modal .mbtns{ display:flex; gap:8px; margin-top:14px; }
+  .modal .mbtns button{ flex:1; border:0; border-radius:9px; padding:11px; font-size:.92rem; font-weight:700; cursor:pointer; }
+  .m-ok{ background:var(--green); color:#fff; } .m-cancel{ background:#eee; color:#444; }
+
+  .toast{ position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:#333; color:#fff; padding:10px 16px; border-radius:8px; font-size:.85rem;
+    opacity:0; transition:.25s; z-index:80; pointer-events:none; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>防除予定カレンダー</h1>
+  <p class="lead">予定（枠）と実績（塗り）を重ねて表示します。雨などのときは延期・日付変更・中止ができ、撒いたら実績化で散布記録になります。</p>
+
+  <div class="calhead">
+    <button class="navbtn" id="prev">‹</button>
+    <div style="text-align:center">
+      <div class="ym" id="ym"></div>
+      <button class="today-link" id="toToday">今月へ</button>
+    </div>
+    <button class="navbtn" id="next">›</button>
+  </div>
+
+  <div class="cal">
+    <div class="dow">
+      <div class="sun">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="sat">土</div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="legend">
+    <span><i class="i-plan"></i>予定</span>
+    <span><i class="i-done"></i>実績（散布済）</span>
+    <span><i class="i-late"></i>予定日が過ぎた予定</span>
+  </div>
+
+  <h2>今後の予定 / 未消化</h2>
+  <div id="list"><div class="empty">読み込み中…</div></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="modal" id="modal"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== 設定：既存アプリと同じ /exec URL を貼る ===== */
+const CONFIG = { GAS_URL: 'https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec' };
+
+let PLANS = [], ACTUALS = [];
+const today = new Date(); today.setHours(0,0,0,0);
+const state = { y: today.getFullYear(), m: today.getMonth() };  // m:0始まり
+const $ = function(id){ return document.getElementById(id); };
+
+/* JSONP（CORS回避） */
+function jsonp(params){
+  return new Promise(function(resolve, reject){
+    const cb = 'cb' + Date.now() + Math.floor(Math.random()*1e4);
+    const q = Object.keys(params)
+      .filter(function(k){ return params[k] !== '' && params[k] != null; })
+      .map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
+    const s = document.createElement('script');
+    const t = setTimeout(function(){ done(); reject(new Error('タイムアウト')); }, 20000);
+    function done(){ clearTimeout(t); delete window[cb]; s.remove(); }
+    window[cb] = function(d){ done(); resolve(d); };
+    s.onerror = function(){ done(); reject(new Error('通信エラー')); };
+    s.src = CONFIG.GAS_URL + '?' + q + (q?'&':'') + 'callback=' + cb;
+    document.body.appendChild(s);
+  });
+}
+
+/* 日付ヘルパー */
+function ymd(v){
+  const s = String(v).replace(/[年月]/g,'-').replace(/日/g,'').replace(/\//g,'-').trim();
+  const m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+  return m ? m[1]+'-'+('0'+m[2]).slice(-2)+'-'+('0'+m[3]).slice(-2) : '';
+}
+function todayStr(){ return ymd(today.getFullYear()+'-'+(today.getMonth()+1)+'-'+today.getDate()); }
+function shortName(s){ s=String(s||''); return s.length>7 ? s.slice(0,7)+'…' : s; }
+function esc(v){ return String(v==null?'':v).replace(/[&<>]/g,function(c){return({'&':'&amp;','<':'&lt;','>':'&gt;'})[c];}); }
+
+let tg; function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(tg); tg=setTimeout(function(){ t.classList.remove('show'); }, 2200); }
+
+/* ===== データ読み込み ===== */
+async function loadAll(){
+  try{
+    const [pl, sp] = await Promise.all([
+      jsonp({ action:'listPlan' }),
+      jsonp({ action:'listSpray', limit:500 })
+    ]);
+    PLANS   = (pl && pl.plans)   ? pl.plans   : [];
+    ACTUALS = (sp && sp.records) ? sp.records : [];
+  }catch(e){
+    PLANS = []; ACTUALS = [];
+    toast('読み込みに失敗しました（GAS_URLを確認）');
+  }
+  renderCalendar(); renderList();
+}
+
+/* ===== カレンダー ===== */
+function renderCalendar(){
+  $('ym').textContent = state.y + '年 ' + (state.m+1) + '月';
+  const grid = $('grid'); grid.innerHTML = '';
+  const first = new Date(state.y, state.m, 1);
+  const start = new Date(first); start.setDate(1 - first.getDay()); // 週頭(日)に合わせる
+  const tStr = todayStr();
+
+  // 当月の予定（予定状態のみ）と実績を日付キーでまとめる
+  const planByDay = {}, doneByDay = {};
+  PLANS.forEach(function(p){
+    if(String(p['状態']) !== '予定') return;
+    const k = ymd(p['予定日']); if(!k) return;
+    (planByDay[k] = planByDay[k] || []).push(p);
+  });
+  ACTUALS.forEach(function(r){
+    const k = ymd(r['散布日']); if(!k) return;
+    (doneByDay[k] = doneByDay[k] || []).push(r);
+  });
+
+  for(var i=0; i<42; i++){
+    const d = new Date(start); d.setDate(start.getDate()+i);
+    const inMonth = (d.getMonth() === state.m);
+    const key = ymd(d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate());
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (inMonth?'':' out') + (key===tStr?' today':'');
+    const dow = d.getDay();
+    cell.innerHTML = '<div class="dnum'+(dow===0?' sun':(dow===6?' sat':''))+'">'+d.getDate()+'</div>';
+
+    const plans = planByDay[key] || [], dones = doneByDay[key] || [];
+    let shown = 0;
+    plans.forEach(function(p){
+      if(shown>=3) return; shown++;
+      const late = key < tStr;
+      const c = document.createElement('div');
+      c.className = 'chip plan' + (late?' late':'');
+      c.textContent = p['品目'] + ' ' + shortName(p['農薬名']);
+      c.onclick = function(){ openActions(p); };
+      cell.appendChild(c);
+    });
+    dones.forEach(function(r){
+      if(shown>=3) return; shown++;
+      const c = document.createElement('div');
+      c.className = 'chip done';
+      c.textContent = r['品目'] + ' ' + shortName(r['農薬名']);
+      cell.appendChild(c);
+    });
+    const extra = (plans.length + dones.length) - shown;
+    if(extra>0){ const m=document.createElement('div'); m.className='more'; m.textContent='ほか'+extra+'件'; cell.appendChild(m); }
+    grid.appendChild(cell);
+  }
+}
+
+/* ===== 今後の予定リスト ===== */
+function renderList(){
+  const tStr = todayStr();
+  const items = PLANS.filter(function(p){ return String(p['状態'])==='予定'; })
+    .sort(function(a,b){ return ymd(a['予定日']) < ymd(b['予定日']) ? -1 : 1; });
+  const list = $('list');
+  if(!items.length){ list.innerHTML = '<div class="empty">予定はありません。農薬の記録画面から「予定に追加」できます。</div>'; return; }
+  list.innerHTML = '';
+  items.forEach(function(p){
+    const late = ymd(p['予定日']) < tStr;
+    const card = document.createElement('div');
+    card.className = 'pcard' + (late?' late':'');
+    card.innerHTML =
+      '<div class="pc-date">'+esc(p['予定日'])+(late?'<span class="late-tag">● 予定日超過</span>':'')+'</div>'+
+      '<div class="pc-main">'+esc(p['品目'])+'　'+esc(p['農薬名'])+'</div>'+
+      '<div class="pc-sub">'+esc(p['圃場'])+'　/　'+esc(p['区分'])+'　/　対象：'+esc(p['対象']||'—')+'　/　'+esc(p['希釈']||'')+'</div>';
+    const btns = document.createElement('div'); btns.className = 'pc-btns';
+    btns.appendChild(mkBtn('実績化','b-do',function(){ openFulfill(p); }));
+    btns.appendChild(mkBtn('＋1日','b-min',function(){ doPostpone(p,1); }));
+    btns.appendChild(mkBtn('＋3日','b-min',function(){ doPostpone(p,3); }));
+    btns.appendChild(mkBtn('日付変更','b-min',function(){ openDate(p); }));
+    btns.appendChild(mkBtn('中止','b-x',function(){ doCancel(p); }));
+    card.appendChild(btns);
+    list.appendChild(card);
+  });
+}
+function mkBtn(label,cls,fn){ const b=document.createElement('button'); b.className=cls; b.textContent=label; b.onclick=fn; return b; }
+
+/* ===== モーダル共通 ===== */
+function showModal(html){ $('modal').innerHTML = html; $('scrim').classList.add('show'); $('modal').classList.add('show'); }
+function closeModal(){ $('scrim').classList.remove('show'); $('modal').classList.remove('show'); }
+$('scrim').onclick = closeModal;
+
+/* チップタップ → 操作メニュー */
+function openActions(p){
+  showModal(
+    '<h3>'+esc(p['品目'])+'　'+esc(p['農薬名'])+'</h3>'+
+    '<div class="info">'+esc(p['予定日'])+'　/　'+esc(p['圃場'])+'　/　'+esc(p['区分'])+'</div>'+
+    '<div class="mbtns" style="flex-direction:column">'+
+      '<button class="m-ok" id="a-do">実績化する</button>'+
+      '<button class="m-cancel" id="a-p1">＋1日 延期</button>'+
+      '<button class="m-cancel" id="a-p3">＋3日 延期</button>'+
+      '<button class="m-cancel" id="a-date">日付を指定して変更</button>'+
+      '<button class="m-cancel" id="a-x" style="color:#c62828">この予定を中止</button>'+
+      '<button class="m-cancel" id="a-close">閉じる</button>'+
+    '</div>');
+  $('a-do').onclick   = function(){ openFulfill(p); };
+  $('a-p1').onclick   = function(){ doPostpone(p,1); };
+  $('a-p3').onclick   = function(){ doPostpone(p,3); };
+  $('a-date').onclick = function(){ openDate(p); };
+  $('a-x').onclick    = function(){ doCancel(p); };
+  $('a-close').onclick= closeModal;
+}
+
+/* 実績化：使用量・実際の散布日・メモを入力して確定 */
+function openFulfill(p){
+  showModal(
+    '<h3>実績化（散布記録へ）</h3>'+
+    '<div class="info">'+esc(p['品目'])+'　'+esc(p['農薬名'])+'　/　'+esc(p['圃場'])+'</div>'+
+    '<label>実際の散布日</label><input type="date" id="m-date" value="'+esc(ymd(p['予定日']))+'">'+
+    '<label>使用量</label><input id="m-amt" placeholder="例：5mL / 1袋">'+
+    '<label>メモ（任意）</label><input id="m-memo" value="'+esc(p['メモ']||'')+'" placeholder="天候・対象の状況など">'+
+    '<div class="mbtns"><button class="m-cancel" id="m-no">やめる</button><button class="m-ok" id="m-yes">記録する</button></div>');
+  $('m-no').onclick = closeModal;
+  $('m-yes').onclick = async function(){
+    try{
+      const res = await jsonp({ action:'fulfillPlan', 予定ID:p['予定ID'],
+        散布日:$('m-date').value, 使用量:$('m-amt').value, メモ:$('m-memo').value });
+      if(!res.ok) throw new Error(res.error||'失敗');
+      closeModal(); toast('散布記録に登録しました'); await loadAll();
+    }catch(e){ toast('実績化に失敗：'+e.message); }
+  };
+}
+
+/* 日付指定で変更 */
+function openDate(p){
+  showModal(
+    '<h3>予定日を変更</h3>'+
+    '<div class="info">'+esc(p['品目'])+'　'+esc(p['農薬名'])+'</div>'+
+    '<label>新しい予定日</label><input type="date" id="m-nd" value="'+esc(ymd(p['予定日']))+'">'+
+    '<div class="mbtns"><button class="m-cancel" id="m-no">やめる</button><button class="m-ok" id="m-yes">変更する</button></div>');
+  $('m-no').onclick = closeModal;
+  $('m-yes').onclick = async function(){
+    const nd = $('m-nd').value; if(!nd){ toast('日付を選んでください'); return; }
+    try{
+      const res = await jsonp({ action:'postponePlan', 予定ID:p['予定ID'], 予定日:nd });
+      if(!res.ok) throw new Error(res.error||'失敗');
+      closeModal(); toast('予定日を変更しました'); await loadAll();
+    }catch(e){ toast('変更に失敗：'+e.message); }
+  };
+}
+
+async function doPostpone(p, days){
+  try{
+    const res = await jsonp({ action:'postponePlan', 予定ID:p['予定ID'], days:days });
+    if(!res.ok) throw new Error(res.error||'失敗');
+    closeModal(); toast(days+'日 延期しました（→ '+res.予定日+'）'); await loadAll();
+  }catch(e){ toast('延期に失敗：'+e.message); }
+}
+async function doCancel(p){
+  if(!confirm('この予定を中止にしますか？\n'+p['品目']+' '+p['農薬名']+'（'+p['予定日']+'）')) return;
+  try{
+    const res = await jsonp({ action:'cancelPlan', 予定ID:p['予定ID'] });
+    if(!res.ok) throw new Error(res.error||'失敗');
+    closeModal(); toast('中止にしました'); await loadAll();
+  }catch(e){ toast('中止に失敗：'+e.message); }
+}
+
+/* ナビ */
+$('prev').onclick = function(){ state.m--; if(state.m<0){ state.m=11; state.y--; } renderCalendar(); };
+$('next').onclick = function(){ state.m++; if(state.m>11){ state.m=0; state.y++; } renderCalendar(); };
+$('toToday').onclick = function(){ state.y=today.getFullYear(); state.m=today.getMonth(); renderCalendar(); };
+
+loadAll();
+</script>
+</body>
+</html>
