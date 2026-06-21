@@ -226,7 +226,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       </button>
       <button class="mapbtn" id="openWork">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        作業報告
+        作業報告・予定
       </button>
     </div>
     <div class="toolbar">
@@ -850,7 +850,7 @@ function renderWorkForm(){
       : '<div class="field" style="margin-top:9px"><input id="w_free" placeholder="作業内容を入力（例：草刈り、見回りなど）"></div>'
   ) : '';
   document.getElementById('fSheetIn').innerHTML=
-    '<div class="fh"><div class="nm">作業報告</div></div>'+
+    '<div class="fh"><div class="nm">作業報告・予定</div></div>'+
     '<div class="rec">'+
       '<div class="field"><label>カテゴリー</label><div class="catgrid">'+catBtns+'</div>'+subHtml+'</div>'+
       '<div class="field"><label>圃場</label><select id="w_field">'+fieldOpts+'</select></div>'+
