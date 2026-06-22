@@ -79,6 +79,15 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .tankpreset{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
 .tankpreset button{flex:1 0 auto;min-width:52px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.32);border-radius:9px;padding:7px 4px;font-size:13px;font-weight:700;cursor:pointer}
 .tankpreset button:active{background:rgba(255,255,255,.32)}
+#alertBar{margin:2px 0 6px}
+.alert{display:flex;gap:9px;align-items:flex-start;border-radius:12px;padding:10px 12px;margin:6px 0;font-size:.86rem;line-height:1.5;border:1px solid}
+.alert .ai{font-size:1.1rem;line-height:1.2}
+.alert .at{font-weight:700;margin-bottom:1px}
+.alert.storm{background:#fdecec;border-color:#f3b9b9;color:#9a2222}
+.alert.snow{background:#eaf2fb;border-color:#bcd5f0;color:#1a4e8a}
+.alert.dry{background:#fff6e5;border-color:#f0dca8;color:#8a5a00}
+.alert.disease{background:#f0f6ee;border-color:#cfe3c4;color:#3a6b2e}
+.alert.calm{background:#f4f6f4;border-color:var(--line);color:var(--sub)}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1750;background:var(--paper);
   border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
   transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.2)}
@@ -268,6 +277,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     </div>
     <div class="crumbs" id="crumbs">品目を選んでください</div>
   </header>
+
+  <div id="alertBar"></div>
 
   <div class="eyebrow"><span class="n">1</span>品目を選ぶ</div>
   <div class="crops" id="crops"></div>
@@ -1183,6 +1194,85 @@ document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
 document.getElementById('openDiag').onclick=openDiag;
 document.getElementById('dScrim').onclick=closeDiag;
+
+/* ============== 天気の先回りアラート（病害・台風・積雪・灌水） ============== */
+/* しきい値はここで調整できます（糸島の実情に合わせて変更可） */
+const ALERT_CFG = {
+  windMs: 15,     // 最大風速(m/s) これ以上で暴風注意
+  gustMs: 20,     // 最大瞬間風速(m/s) これ以上で暴風注意
+  snowCm: 1,      // 降雪(cm) これ以上で積雪注意
+  dryDays: 4,     // 連続でまとまった雨なしと見なす日数
+  dryMm: 1,       // 上記期間の降水量合計がこれ未満なら乾燥注意
+  dryTmax: 25,    // かつ最高気温がこれ以上の日が含まれる場合に灌水注意
+  humidDays: 2,   // 多湿が続くと見なす連続日数
+  humidProb: 60,  // 降水確率がこれ以上、または降水量3mm以上を「多湿日」とする
+  humidTmaxLo: 15, humidTmaxHi: 28  // 病害が出やすい気温帯
+};
+function md(iso){ const d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }
+function dayLabel(i){ return i===0?'今日':i===1?'明日':i===2?'あさって':(i+'日後'); }
+function computeAlerts(dl){
+  const al=[];
+  const t=dl.time||[], wind=dl.wind||[], gust=dl.gust||[], snow=dl.snow||[],
+        precip=dl.precip||[], prob=dl.precip_prob||[], tmax=dl.tmax||[];
+  const N=t.length;
+  // 台風・暴風：今後の中で最初に基準を超える日
+  for(let i=0;i<N;i++){
+    if((wind[i]>=ALERT_CFG.windMs)||(gust[i]>=ALERT_CFG.gustMs)){
+      al.push({type:'storm', icon:'🌀', title:'暴風・台風に注意',
+        msg:dayLabel(i)+'（'+md(t[i])+'）に最大風速'+Math.round(wind[i])+'m/s・瞬間'+Math.round(gust[i])+'m/sの予報。支柱やハウスの補強、収穫の前倒し、排水の確認を。'});
+      break;
+    }
+  }
+  // 積雪
+  for(let i=0;i<N;i++){
+    if(snow[i]>=ALERT_CFG.snowCm){
+      al.push({type:'snow', icon:'❄️', title:'積雪に注意',
+        msg:dayLabel(i)+'（'+md(t[i])+'）に降雪'+(snow[i].toFixed(1))+'cmの予報。ハウスの雪対策、トンネルの補強、収穫の前倒しを。'});
+      break;
+    }
+  }
+  // 灌水（少雨）：今日から dryDays 日の降水量合計がほぼゼロ、かつ高温日を含む
+  if(N>=ALERT_CFG.dryDays){
+    let sum=0, hot=false;
+    for(let i=0;i<ALERT_CFG.dryDays;i++){ sum+=(precip[i]||0); if(tmax[i]>=ALERT_CFG.dryTmax) hot=true; }
+    if(sum<ALERT_CFG.dryMm){
+      al.push({type:'dry', icon:'☀️', title:'乾燥・灌水の検討',
+        msg:'向こう'+ALERT_CFG.dryDays+'日はまとまった雨の予報がありません'+(hot?'（高温日あり）':'')+'。乾燥に注意し、定植直後や水を好む作物は灌水の検討を。'});
+    }
+  }
+  // 病害（多湿）：humidDays 日連続で「多湿日」かつ適温
+  let run=0, hitFrom=-1;
+  for(let i=0;i<N;i++){
+    const wet=((prob[i]>=ALERT_CFG.humidProb)||(precip[i]>=3));
+    const mild=(tmax[i]>=ALERT_CFG.humidTmaxLo && tmax[i]<=ALERT_CFG.humidTmaxHi);
+    if(wet&&mild){ if(run===0) hitFrom=i; run++; if(run>=ALERT_CFG.humidDays) break; }
+    else run=0;
+  }
+  if(run>=ALERT_CFG.humidDays){
+    al.push({type:'disease', icon:'🦠', title:'病害に注意（多湿）',
+      msg:dayLabel(hitFrom)+'（'+md(t[hitFrom])+'）ごろから多湿が続く予報。べと病・疫病・灰色かび病などが出やすい条件です。予防防除や見回り、写真診断の活用を。'});
+  }
+  return al;
+}
+async function loadAlerts(){
+  const bar=document.getElementById('alertBar'); if(!bar) return;
+  if(!CONFIG.GAS_URL) return;
+  try{
+    const res=await fetch(CONFIG.GAS_URL+'?action=forecast');
+    const fc=await res.json();
+    if(!fc||!fc.daily) return;
+    const al=computeAlerts(fc.daily);
+    if(!al.length){
+      bar.innerHTML='<div class="alert calm"><span class="ai">🌤️</span><div>向こう数日、特筆すべき気象の注意はありません。</div></div>';
+      return;
+    }
+    bar.innerHTML=al.map(a=>
+      '<div class="alert '+a.type+'"><span class="ai">'+a.icon+'</span>'+
+      '<div><div class="at">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>'
+    ).join('');
+  }catch(e){ /* 取得失敗時はバナー非表示のまま */ }
+}
+loadAlerts();
 
 
 </script>
