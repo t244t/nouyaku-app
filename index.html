@@ -737,11 +737,14 @@ async function runDiagnose(){
     document.getElementById('dg_run').disabled=false;
   }
 }
+let dgState={crop:null, slug:null, candidates:[], note:'', master:null};
+function slugOf(cropName){ const f=CROPS.find(([n,s])=>n.replace('\n','')===cropName); return f?f[1]:null; }
 function renderDiagResult(j, box){
   const cs=j.candidates||[];
+  dgState.crop=j.crop; dgState.slug=slugOf(j.crop); dgState.candidates=cs; dgState.note=j.note||''; dgState.master=null;
   if(!cs.length){ box.innerHTML='<div class="dgnote">はっきりした候補が出ませんでした。写真を変える（患部に寄る・明るく撮る）と精度が上がります。</div>'; return; }
   let html='<div class="lab" style="margin-top:12px;font-weight:700;color:var(--stem-dk)">'+esc(j.crop)+'の診断候補</div>';
-  cs.forEach(function(c){
+  cs.forEach(function(c,idx){
     const conf=(c.confidence||'低');
     html+='<div class="dgcand">'+
       '<div class="nm">'+esc(c.name||'(名称不明)')+
@@ -750,11 +753,84 @@ function renderDiagResult(j, box){
       '</div>'+
       (c.symptoms?'<div class="lab">主な症状</div><div class="val">'+esc(c.symptoms)+'</div>':'')+
       (c.points?'<div class="lab">見分けのポイント</div><div class="val">'+esc(c.points)+'</div>':'')+
+      '<button class="mapbtn" style="width:100%;margin-top:8px;border-color:#2e7d32;color:#1b5e20" onclick="showRx('+idx+')">この病害虫に使える登録農薬を見る</button>'+
     '</div>';
   });
   if(j.note) html+='<div class="dgnote">'+esc(j.note)+'</div>';
-  html+='<div class="dgwarn">これは参考情報です。防除薬の選定はこのあと（次の段階で）この作物の登録農薬から提案します。迷う場合は普及指導員・JAにご相談ください。</div>';
+  html+='<div class="dgwarn">これは参考情報です。登録農薬の提案も、必ずこの作物に登録のあるものだけを表示します。迷う場合は普及指導員・JAにご相談ください。</div>';
   box.innerHTML=html;
+}
+/* 病害虫名の表記ゆれ吸収（NFKC・カタカナ→ひらがな・空白除去・「類」の揺れ・部分一致） */
+function normName(s){
+  let x=(s||'').normalize('NFKC').replace(/\s/g,'');
+  x=x.replace(/[\u30a1-\u30f6]/g, m=>String.fromCharCode(m.charCodeAt(0)-0x60)); // カナ→かな
+  return x;
+}
+function mushiMatch(target, cand){
+  let t=normName(target), c=normName(cand);
+  if(!t||!c) return false;
+  if(t===c) return true;
+  let t2=t.replace(/類$/,''), c2=c.replace(/類$/,'');
+  if(t2===c2) return true;
+  if(t.indexOf(c)>=0 || c.indexOf(t)>=0) return true;
+  if(t2.indexOf(c2)>=0 || c2.indexOf(t2)>=0) return true;
+  return false;
+}
+async function showRx(idx){
+  const cand=dgState.candidates[idx]; if(!cand) return;
+  const box=document.getElementById('dg_result');
+  if(!dgState.slug){
+    box.innerHTML='<div class="dgwarn">「'+esc(dgState.crop)+'」の農薬マスタが見つかりません（品目未登録）。</div>'+
+      '<button class="mapbtn" style="width:100%;margin-top:8px" onclick="backToCandidates()">← 診断候補に戻る</button>';
+    return;
+  }
+  box.innerHTML='<div class="dgloading">'+esc(dgState.crop)+'の登録農薬を照合中…</div>';
+  if(!dgState.master){
+    try{
+      const r=await fetch(CONFIG.DATA_BASE+dgState.slug+'.json');
+      dgState.master=await r.json();
+    }catch(e){
+      box.innerHTML='<div class="dgwarn">農薬マスタの読み込みに失敗しました。</div>'+
+        '<button class="mapbtn" style="width:100%;margin-top:8px" onclick="backToCandidates()">← 診断候補に戻る</button>';
+      return;
+    }
+  }
+  const all=(dgState.master.農薬||[]).filter(r=> r.区!=='除草' && mushiMatch(r.虫, cand.name));
+  // 名＋希＋期＋法 で重複排除、直接を優先表示
+  const seen={}, list=[];
+  all.forEach(r=>{ const k=r.名+'|'+r.希+'|'+r.期+'|'+r.法; if(!seen[k]){ seen[k]=1; list.push(r); } });
+  list.sort((a,b)=> (a.登==='直接'?0:1)-(b.登==='直接'?0:1));
+  renderRx(cand, list, box);
+}
+function renderRx(cand, list, box){
+  let html='<button class="mapbtn" style="margin-top:10px" onclick="backToCandidates()">← 診断候補に戻る</button>'+
+    '<div class="lab" style="margin-top:10px;font-weight:700;color:var(--stem-dk)">'+esc(dgState.crop)+' ／ '+esc(cand.name)+' に登録のある農薬</div>';
+  if(!list.length){
+    html+='<div class="dgnote">この病害虫名では、'+esc(dgState.crop)+'に登録のある農薬が見つかりませんでした。診断名の表記が異なる可能性があります。別の候補も確認してみてください。</div>';
+    box.innerHTML=html; return;
+  }
+  html+='<div class="lab">該当 '+list.length+' 件（同じ薬剤は1つにまとめています。必ずラベルで最終確認を）</div>';
+  list.slice(0,40).forEach(r=>{
+    html+='<div class="dgcand">'+
+      '<div class="nm">'+esc(r.名)+
+        '<span class="dgtag">'+esc(r.剤||'')+'</span>'+
+        (r.登==='直接'?'<span class="dgtag dgconf-高">直接登録</span>':'<span class="dgtag">グループ</span>')+
+      '</div>'+
+      '<div class="val" style="margin-top:4px">'+
+        '希釈：'+esc(r.希||'—')+'<br>'+
+        '使用時期：'+esc(r.期||'—')+' ／ 使用回数：'+esc(r.回||'—')+'<br>'+
+        '使用方法：'+esc(r.法||'—')+'<br>'+
+        '<span style="color:var(--sub);font-size:.78rem">対象：'+esc(r.虫||'')+'</span>'+
+      '</div>'+
+    '</div>';
+  });
+  if(list.length>40) html+='<div class="lab">ほか '+(list.length-40)+' 件（多すぎる場合は候補名で絞られています）</div>';
+  html+='<div class="dgwarn">表示は'+esc(dgState.crop)+'にFAMIC登録のある農薬のみです。実際の使用前に必ずラベルで適用作物・対象・希釈・使用時期・回数をご確認ください。</div>';
+  box.innerHTML=html;
+}
+function backToCandidates(){
+  const box=document.getElementById('dg_result');
+  renderDiagResult({crop:dgState.crop, candidates:dgState.candidates, note:dgState.note}, box);
 }
 
 /* ============== 圃場マップ ============== */
