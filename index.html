@@ -101,6 +101,23 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .wxday .wtemp b{color:#c0392b}.wxday .wtemp span{color:#1f6fd6}
 .wxday .wpop{font-size:10.5px;color:#1f6fd6;margin-top:2px}
 .wxday .wwind{font-size:10px;color:var(--soft);margin-top:1px}
+#growBox{margin:12px 0 2px}
+.growedit{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--stem-dk);border-radius:8px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer}
+.gchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.gchip{background:var(--stem);color:#fff;border-radius:999px;padding:4px 11px;font-size:12.5px;font-weight:700}
+.gnone{color:var(--soft);font-size:12.5px}
+.gtogs{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
+.gtog{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:11px;padding:9px 4px;font-size:12.5px;font-weight:700;cursor:pointer}
+.gtog.on{background:var(--stem);border-color:var(--stem);color:#fff}
+.crop{position:relative}
+.crop .gdot{display:none}
+.crop.growing{border-color:var(--stem)}
+.crop.growing .gdot{display:block;position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--stem)}
+.crop.growing[aria-pressed="true"] .gdot{background:#fff}
+#gScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#gScrim.show{opacity:1;pointer-events:auto}
+#gSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#gSheet.show{transform:translateY(0)}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1750;background:var(--paper);
   border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
   transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.2)}
@@ -344,6 +361,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     </div>
   </div>
 
+  <div id="growBox"></div>
+
   <div class="eyebrow"><span class="n">1</span>品目を選ぶ</div>
   <div class="crumbs" id="crumbs">品目を選んでください</div>
   <div class="crops" id="crops"></div>
@@ -393,6 +412,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 
 <div id="dScrim"></div>
 <div id="dSheet"><div class="grab"></div><div class="sheet-in" id="dSheetIn"></div></div>
+
+<div id="gScrim"></div>
+<div id="gSheet"><div class="grab"></div><div class="sheet-in" id="gSheetIn"></div></div>
 
 <script>
 /* ============== 設定（デプロイ時に書き換え） ============== */
@@ -451,7 +473,8 @@ const cropsEl = document.getElementById('crops');
 CROPS.forEach(([name,slug])=>{
   const b=document.createElement('button');
   b.className='crop'; b.type='button'; b.setAttribute('aria-pressed','false');
-  b.innerHTML = name.replace('\n','<br>');
+  b.dataset.crop=name.replace('\n','');
+  b.innerHTML = name.replace('\n','<br>') + '<span class="gdot"></span>';
   b.onclick=()=>selectCrop(name.replace('\n',''),slug,b);
   cropsEl.appendChild(b);
 });
@@ -1378,6 +1401,64 @@ function renderWeek(dl){
   box.innerHTML=h;
 }
 loadAlerts();
+
+/* ============== 栽培中の作物（全体把握・第一段階） ============== */
+let GROWING=[];
+function markGrowing(){
+  document.querySelectorAll('.crop').forEach(b=>{
+    b.classList.toggle('growing', GROWING.indexOf(b.dataset.crop)>=0);
+  });
+}
+function renderGrowBox(){
+  const box=document.getElementById('growBox'); if(!box) return;
+  const chips = GROWING.length
+    ? GROWING.map(c=>'<span class="gchip">'+esc(c)+'</span>').join('')
+    : '<span class="gnone">未設定（編集から今作っている作物を選べます）</span>';
+  box.innerHTML=
+    '<div class="eyebrow" style="justify-content:space-between"><span>栽培中の作物</span>'+
+      '<button class="growedit" id="growEdit">編集</button></div>'+
+    '<div class="gchips">'+chips+'</div>';
+  document.getElementById('growEdit').onclick=openGrowEdit;
+}
+async function loadGrowing(){
+  if(CONFIG.GAS_URL){
+    try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listGrowing')).json();
+      GROWING=(j&&j.crops)?j.crops:[]; }catch(e){ GROWING=[]; }
+  }
+  renderGrowBox(); markGrowing();
+}
+function openGrowEdit(){
+  const sel=new Set(GROWING);
+  const tg=CROPS.map(([name])=>{ const n=name.replace('\n','');
+    return '<button type="button" class="gtog'+(sel.has(n)?' on':'')+'" data-c="'+esc(n)+'">'+esc(n)+'</button>'; }).join('');
+  document.getElementById('gSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">栽培中の作物を選ぶ</div></div>'+
+    '<div class="rec"><div style="color:var(--soft);font-size:.82rem;margin-bottom:10px">今まさに育てている作物をタップして選んでください（複数可）。</div>'+
+    '<div class="gtogs">'+tg+'</div>'+
+    '<button class="save" id="growSave" style="margin-top:14px">この内容で保存</button></div>';
+  document.querySelectorAll('.gtog').forEach(b=>{ b.onclick=()=>b.classList.toggle('on'); });
+  document.getElementById('growSave').onclick=saveGrowingNow;
+  document.getElementById('gScrim').classList.add('show');
+  document.getElementById('gSheet').classList.add('show');
+}
+function closeGrowEdit(){
+  document.getElementById('gScrim').classList.remove('show');
+  document.getElementById('gSheet').classList.remove('show');
+}
+async function saveGrowingNow(){
+  const chosen=[...document.querySelectorAll('.gtog.on')].map(b=>b.dataset.c);
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const btn=document.getElementById('growSave'); btn.disabled=true; btn.textContent='保存中…';
+  try{
+    const u=CONFIG.GAS_URL+'?action=saveGrowing&'+new URLSearchParams({crops:chosen.join(',')}).toString();
+    const j=await (await fetch(u)).json();
+    if(j&&j.ok){ GROWING=j.crops||chosen; renderGrowBox(); markGrowing(); closeGrowEdit(); toast('栽培中の作物を保存しました'); }
+    else toast('保存に失敗しました');
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ btn.disabled=false; btn.textContent='この内容で保存'; }
+}
+document.getElementById('gScrim').onclick=closeGrowEdit;
+loadGrowing();
 
 
 </script>
