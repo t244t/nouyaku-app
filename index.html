@@ -89,6 +89,18 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .alert.dry{background:#fff6e5;border-color:#f0dca8;color:#8a5a00}
 .alert.disease{background:#f0f6ee;border-color:#cfe3c4;color:#3a6b2e}
 .alert.calm{background:#f4f6f4;border-color:var(--line);color:var(--sub)}
+#weekWx{margin:8px 0 2px}
+.wxhead{font-size:11px;letter-spacing:.12em;color:var(--soft);font-weight:700;margin:6px 2px}
+.wxrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.wxday{flex:0 0 auto;width:62px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;box-shadow:var(--shadow)}
+.wxday .wd{font-size:12px;font-weight:800;color:var(--ink)}
+.wxday .wd.sun{color:#c0392b}.wxday .wd.sat{color:#1f6fd6}
+.wxday .wdt{font-size:10px;color:var(--soft);margin-bottom:2px}
+.wxday .wic{font-size:22px;line-height:1.25}
+.wxday .wtemp{font-size:12px;margin-top:2px;font-variant-numeric:tabular-nums}
+.wxday .wtemp b{color:#c0392b}.wxday .wtemp span{color:#1f6fd6}
+.wxday .wpop{font-size:10.5px;color:#1f6fd6;margin-top:2px}
+.wxday .wwind{font-size:10px;color:var(--soft);margin-top:1px}
 .sheet{position:fixed;left:0;right:0;bottom:0;z-index:1750;background:var(--paper);
   border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
   transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.2)}
@@ -266,6 +278,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   </header>
 
   <div id="alertBar"></div>
+
+  <div id="weekWx"></div>
 
   <div class="menu">
     <div class="eyebrow">防除・診断</div>
@@ -1314,12 +1328,14 @@ function computeAlerts(dl){
   return al;
 }
 async function loadAlerts(){
-  const bar=document.getElementById('alertBar'); if(!bar) return;
+  const bar=document.getElementById('alertBar');
   if(!CONFIG.GAS_URL) return;
   try{
     const res=await fetch(CONFIG.GAS_URL+'?action=forecast');
     const fc=await res.json();
     if(!fc||!fc.daily) return;
+    renderWeek(fc.daily);
+    if(!bar) return;
     const al=computeAlerts(fc.daily);
     if(!al.length){
       bar.innerHTML='<div class="alert calm"><span class="ai">🌤️</span><div>向こう数日、特筆すべき気象の注意はありません。</div></div>';
@@ -1329,7 +1345,37 @@ async function loadAlerts(){
       '<div class="alert '+a.type+'"><span class="ai">'+a.icon+'</span>'+
       '<div><div class="at">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>'
     ).join('');
-  }catch(e){ /* 取得失敗時はバナー非表示のまま */ }
+  }catch(e){ /* 取得失敗時は非表示のまま */ }
+}
+/* 週間天気の天気アイコン推定（降水量・降水確率・降雪から） */
+function wxIcon(precip, prob, snow){
+  precip=precip||0; prob=prob||0; snow=snow||0;
+  if(snow>=0.5) return '❄️';
+  if(precip>=5||prob>=70) return '🌧️';
+  if(precip>=1||prob>=50) return '🌦️';
+  if(prob>=30) return '⛅';
+  return '☀️';
+}
+function jpDow(iso){ const d=new Date(iso+'T00:00:00'); return '日月火水木金土'[d.getDay()]; }
+function renderWeek(dl){
+  const box=document.getElementById('weekWx'); if(!box||!dl||!dl.time) return;
+  const n=Math.min(7, dl.time.length);
+  let h='<div class="wxhead">週間天気（糸島）</div><div class="wxrow">';
+  for(let i=0;i<n;i++){
+    const dow=jpDow(dl.time[i]);
+    const cls=dow==='日'?'sun':dow==='土'?'sat':'';
+    const pp=(dl.precip_prob&&dl.precip_prob[i]!=null)?dl.precip_prob[i]:'–';
+    h+='<div class="wxday">'+
+      '<div class="wd '+cls+'">'+(i===0?'今日':dow)+'</div>'+
+      '<div class="wdt">'+md(dl.time[i])+'</div>'+
+      '<div class="wic">'+wxIcon(dl.precip&&dl.precip[i], dl.precip_prob&&dl.precip_prob[i], dl.snow&&dl.snow[i])+'</div>'+
+      '<div class="wtemp"><b>'+Math.round((dl.tmax&&dl.tmax[i])||0)+'</b>/<span>'+Math.round((dl.tmin&&dl.tmin[i])||0)+'</span></div>'+
+      '<div class="wpop">☂'+pp+'%</div>'+
+      '<div class="wwind">'+Math.round((dl.wind&&dl.wind[i])||0)+'m/s</div>'+
+    '</div>';
+  }
+  h+='</div>';
+  box.innerHTML=h;
 }
 loadAlerts();
 
