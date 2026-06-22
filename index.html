@@ -176,6 +176,24 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:86vh;overflow:auto;
   box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
 #fSheet.show{transform:translateY(0)}
+#dScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#dScrim.show{opacity:1;pointer-events:auto}
+#dSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);
+  border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
+  transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow:auto;
+  box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#dSheet.show{transform:translateY(0)}
+.dgcand{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px 0;background:var(--card)}
+.dgcand .nm{font-weight:700;font-size:1rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dgtag{font-size:.7rem;padding:1px 7px;border-radius:999px;border:1px solid var(--line)}
+.dgconf-高{background:#e9f6ec;color:#1b6e2e;border-color:#bfe3c6}
+.dgconf-中{background:#fff6e5;color:#9a6a00;border-color:#f0dca8}
+.dgconf-低{background:#f1f1f1;color:#666}
+.dgcand .lab{font-size:.72rem;color:var(--sub);margin-top:6px}
+.dgcand .val{font-size:.86rem;line-height:1.5}
+.dgnote{font-size:.8rem;background:#f4f8f4;border:1px solid var(--line);border-radius:10px;padding:9px 11px;margin-top:8px;color:var(--stem-dk)}
+.dgwarn{font-size:.76rem;color:#8a5a00;background:#fff8e8;border:1px solid #f0dca8;border-radius:10px;padding:8px 11px;margin-top:8px}
+.dgloading{text-align:center;color:var(--sub);padding:18px;font-size:.9rem}
 .fh{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0 2px}
 .fh .nm{font-size:21px;font-weight:800}
 .fh .grp{font-size:12px;color:var(--soft)}
@@ -239,6 +257,12 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         防除履歴
       </a>
     </div>
+    <div class="toolbar">
+      <button class="mapbtn" id="openDiag" style="flex:1;border-color:#2e7d32;color:#1b5e20">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        病害虫を写真で診断
+      </button>
+    </div>
     <div class="crumbs" id="crumbs">品目を選んでください</div>
   </header>
 
@@ -287,6 +311,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="fScrim"></div>
 <div id="fSheet"><div class="grab"></div><div class="sheet-in" id="fSheetIn"></div></div>
+
+<div id="dScrim"></div>
+<div id="dSheet"><div class="grab"></div><div class="sheet-in" id="dSheetIn"></div></div>
 
 <script>
 /* ============== 設定（デプロイ時に書き換え） ============== */
@@ -640,6 +667,96 @@ let tg; function toast(msg){ const t=document.getElementById('toast');
   tg=setTimeout(()=>t.classList.remove('show'),2600); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
 
+/* ============== AI病害虫診断（第一段階：候補表示） ============== */
+let dgPhoto=null;  // {dataUrl, mime}
+function openDiag(){
+  dgPhoto=null;
+  renderDiagForm();
+  document.getElementById('dScrim').classList.add('show');
+  document.getElementById('dSheet').classList.add('show');
+}
+function closeDiag(){
+  document.getElementById('dScrim').classList.remove('show');
+  document.getElementById('dSheet').classList.remove('show');
+}
+function renderDiagForm(){
+  const opts = CROPS.map(([name,slug])=>{
+    const n=name.replace('\n','');
+    const sel = (state.crop===n)?' selected':'';
+    return '<option value="'+esc(n)+'"'+sel+'>'+esc(n)+'</option>';
+  }).join('');
+  document.getElementById('dSheetIn').innerHTML =
+    '<div class="fh"><div class="nm">病害虫を写真で診断</div></div>'+
+    '<div class="rec">'+
+      '<div class="field"><label>作物</label><select id="dg_crop"><option value="">選んでください</option>'+opts+'</select></div>'+
+      '<div class="field"><label>写真（葉や患部がはっきり写るように）</label>'+
+        '<input id="dg_photo" type="file" accept="image/*" capture="environment" style="padding:9px 12px">'+
+        '<div id="dg_prev" class="photoprev"></div></div>'+
+      '<div class="field"><label>部位（任意）</label><select id="dg_part">'+
+        '<option value="">指定なし</option><option>葉</option><option>茎</option><option>果実</option><option>根</option><option>株全体</option><option>その他</option>'+
+      '</select></div>'+
+      '<div class="field"><label>気づいた点（任意）</label><input id="dg_note" placeholder="例：3日前から下葉に黄色い斑点、広がってきた"></div>'+
+      '<button class="save" id="dg_run">この写真で診断する</button>'+
+      '<div class="dgwarn">診断はAIによる参考情報です。よく似た病害虫があり外れることもあります。最終判断はご自身で行い、迷う場合は普及指導員やJAにご相談ください。</div>'+
+      '<div id="dg_result"></div>'+
+    '</div>';
+  document.getElementById('dg_photo').onchange=onPickDiagPhoto;
+  document.getElementById('dg_run').onclick=runDiagnose;
+}
+async function onPickDiagPhoto(e){
+  const f=(e.target.files||[])[0];
+  if(!f) return;
+  const dataUrl=await resizeImage(f,1280);
+  if(!dataUrl){ toast('画像を読み込めませんでした'); return; }
+  dgPhoto={dataUrl:dataUrl, mime:'image/jpeg'};
+  const prev=document.getElementById('dg_prev');
+  prev.innerHTML='<div class="pthumb"><img src="'+dataUrl+'"></div>';
+}
+async function runDiagnose(){
+  const crop=document.getElementById('dg_crop').value;
+  const part=document.getElementById('dg_part').value;
+  const note=document.getElementById('dg_note').value;
+  const box=document.getElementById('dg_result');
+  if(!crop){ toast('作物を選んでください'); return; }
+  if(!dgPhoto){ toast('写真を選んでください'); return; }
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  box.innerHTML='<div class="dgloading">診断中です。数秒〜十数秒お待ちください…</div>';
+  document.getElementById('dg_run').disabled=true;
+  try{
+    const res=await fetch(CONFIG.GAS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({action:'diagnose', crop:crop, part:part, note:note, image:dgPhoto.dataUrl, mime:dgPhoto.mime})
+    });
+    const j=await res.json();
+    if(!j || !j.ok){ box.innerHTML='<div class="dgwarn">診断できませんでした：'+esc((j&&j.error)||'不明なエラー')+'</div>'; return; }
+    renderDiagResult(j, box);
+  }catch(err){
+    box.innerHTML='<div class="dgwarn">通信に失敗しました。電波の良い場所で、もう一度お試しください。</div>';
+  }finally{
+    document.getElementById('dg_run').disabled=false;
+  }
+}
+function renderDiagResult(j, box){
+  const cs=j.candidates||[];
+  if(!cs.length){ box.innerHTML='<div class="dgnote">はっきりした候補が出ませんでした。写真を変える（患部に寄る・明るく撮る）と精度が上がります。</div>'; return; }
+  let html='<div class="lab" style="margin-top:12px;font-weight:700;color:var(--stem-dk)">'+esc(j.crop)+'の診断候補</div>';
+  cs.forEach(function(c){
+    const conf=(c.confidence||'低');
+    html+='<div class="dgcand">'+
+      '<div class="nm">'+esc(c.name||'(名称不明)')+
+        '<span class="dgtag">'+esc(c.type||'')+'</span>'+
+        '<span class="dgtag dgconf-'+esc(conf)+'">確からしさ：'+esc(conf)+'</span>'+
+      '</div>'+
+      (c.symptoms?'<div class="lab">主な症状</div><div class="val">'+esc(c.symptoms)+'</div>':'')+
+      (c.points?'<div class="lab">見分けのポイント</div><div class="val">'+esc(c.points)+'</div>':'')+
+    '</div>';
+  });
+  if(j.note) html+='<div class="dgnote">'+esc(j.note)+'</div>';
+  html+='<div class="dgwarn">これは参考情報です。防除薬の選定はこのあと（次の段階で）この作物の登録農薬から提案します。迷う場合は普及指導員・JAにご相談ください。</div>';
+  box.innerHTML=html;
+}
+
 /* ============== 圃場マップ ============== */
 const FIELDS_SEED = [
  {name:"ねぎ前上",lat:33.51208947754096,lon:130.19979046061408,area:3145,"所有":"所有","所有者":"農・みのり","栽培作物":"オクラ,カボチャ,バターピーナッツ","住所":"糸島市飯原字片山崎1671番地","備考":"2023.4〜取得"},
@@ -966,6 +1083,8 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+document.getElementById('openDiag').onclick=openDiag;
+document.getElementById('dScrim').onclick=closeDiag;
 
 
 </script>
