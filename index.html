@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>農・みのり 農薬管理</title>
+<title>農・みのり 農場管理</title>
 <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -84,6 +84,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .alert .ai{font-size:1.1rem;line-height:1.2}
 .alert .at{font-weight:700;margin-bottom:1px}
 .alert.storm{background:#fdecec;border-color:#f3b9b9;color:#9a2222}
+.alert.wind{background:#fff4e9;border-color:#f0c9a0;color:#9a5a1a}
 .alert.snow{background:#eaf2fb;border-color:#bcd5f0;color:#1a4e8a}
 .alert.dry{background:#fff6e5;border-color:#f0dca8;color:#8a5a00}
 .alert.disease{background:#f0f6ee;border-color:#cfe3c4;color:#3a6b2e}
@@ -245,7 +246,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <header>
     <div class="brand">
       <span class="leaf">🌱</span>
-      <h1>農薬管理</h1>
+      <h1>農場管理</h1>
       <span class="sub">農・みのり</span>
       <span id="demoFlag" class="demoflag" style="margin-left:auto">プレビュー版</span>
     </div>
@@ -1198,8 +1199,10 @@ document.getElementById('dScrim').onclick=closeDiag;
 /* ============== 天気の先回りアラート（病害・台風・積雪・灌水） ============== */
 /* しきい値はここで調整できます（糸島の実情に合わせて変更可） */
 const ALERT_CFG = {
-  windMs: 15,     // 最大風速(m/s) これ以上で暴風注意
-  gustMs: 20,     // 最大瞬間風速(m/s) これ以上で暴風注意
+  windMs: 10,     // 平均風速(m/s) これ以上で強風注意
+  windStormMs: 17,// 平均風速(m/s) これ以上は暴風・台風級
+  gustMs: 20,     // 最大瞬間風速(m/s) これ以上で強風注意
+  gustStormMs: 30,// 最大瞬間風速(m/s) これ以上は暴風・台風級
   snowCm: 1,      // 降雪(cm) これ以上で積雪注意
   dryDays: 4,     // 連続でまとまった雨なしと見なす日数
   dryMm: 1,       // 上記期間の降水量合計がこれ未満なら乾燥注意
@@ -1215,13 +1218,19 @@ function computeAlerts(dl){
   const t=dl.time||[], wind=dl.wind||[], gust=dl.gust||[], snow=dl.snow||[],
         precip=dl.precip||[], prob=dl.precip_prob||[], tmax=dl.tmax||[];
   const N=t.length;
-  // 台風・暴風：今後の中で最初に基準を超える日
+  // 強風・台風：今後の中で最初に基準を超える日。風速に応じて段階表示
   for(let i=0;i<N;i++){
-    if((wind[i]>=ALERT_CFG.windMs)||(gust[i]>=ALERT_CFG.gustMs)){
+    const strong=(wind[i]>=ALERT_CFG.windMs)||(gust[i]>=ALERT_CFG.gustMs);
+    if(!strong) continue;
+    const storm=(wind[i]>=ALERT_CFG.windStormMs)||(gust[i]>=ALERT_CFG.gustStormMs);
+    if(storm){
       al.push({type:'storm', icon:'🌀', title:'暴風・台風に注意',
         msg:dayLabel(i)+'（'+md(t[i])+'）に最大風速'+Math.round(wind[i])+'m/s・瞬間'+Math.round(gust[i])+'m/sの予報。支柱やハウスの補強、収穫の前倒し、排水の確認を。'});
-      break;
+    }else{
+      al.push({type:'wind', icon:'🌬️', title:'強風に注意',
+        msg:dayLabel(i)+'（'+md(t[i])+'）に最大風速'+Math.round(wind[i])+'m/s・瞬間'+Math.round(gust[i])+'m/sの予報。防虫ネットやマルチのめくれ、支柱の傾き、軽い資材の飛散に注意を。'});
     }
+    break;
   }
   // 積雪
   for(let i=0;i<N;i++){
