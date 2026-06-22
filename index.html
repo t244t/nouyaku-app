@@ -74,9 +74,12 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .pcard.j .chip.dose{background:#F6ECE0;color:var(--jokusou)}
 .empty{text-align:center;color:var(--soft);padding:40px 10px;font-size:14px}
 /* sheet */
-.scrim{position:fixed;inset:0;background:rgba(24,35,26,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:40}
+.scrim{position:fixed;inset:0;background:rgba(24,35,26,.45);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1700}
 .scrim.show{opacity:1;pointer-events:auto}
-.sheet{position:fixed;left:0;right:0;bottom:0;z-index:50;background:var(--paper);
+.tankpreset{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
+.tankpreset button{flex:1 0 auto;min-width:52px;background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.32);border-radius:9px;padding:7px 4px;font-size:13px;font-weight:700;cursor:pointer}
+.tankpreset button:active{background:rgba(255,255,255,.32)}
+.sheet{position:fixed;left:0;right:0;bottom:0;z-index:1750;background:var(--paper);
   border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);
   transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.2)}
 .sheet.show{transform:translateY(0)}
@@ -506,6 +509,14 @@ function openSheet(r){
         <input id="tank" type="number" inputmode="decimal" value="20" min="1" step="1">
         <span class="u">L</span>
       </div>
+      <div class="tankpreset" id="tankpreset">
+        <button type="button" data-l="5">5L</button>
+        <button type="button" data-l="10">10L</button>
+        <button type="button" data-l="15">15L</button>
+        <button type="button" data-l="20">20L</button>
+        <button type="button" data-l="200">200L</button>
+        <button type="button" data-l="500">500L</button>
+      </div>
       <div class="result">
         <div class="lbl">必要な薬量</div>
         <div class="big" id="dose"></div>
@@ -538,6 +549,9 @@ function openSheet(r){
       const d=doseText(t,bai); document.getElementById('dose').innerHTML=d.val.replace(/(mL|L)/g,'<span class="un">$1</span>');
       document.getElementById('dosesub').textContent=d.sub; };
     document.getElementById('tank').oninput=upd; upd();
+    document.querySelectorAll('#tankpreset button').forEach(b=>{
+      b.onclick=()=>{ const t=document.getElementById('tank'); t.value=b.dataset.l; upd(); };
+    });
   }
   document.getElementById('saveBtn').onclick=saveRecord;
   document.getElementById('planBtn').onclick=savePlan;
@@ -809,9 +823,10 @@ function renderRx(cand, list, box){
     html+='<div class="dgnote">この病害虫名では、'+esc(dgState.crop)+'に登録のある農薬が見つかりませんでした。診断名の表記が異なる可能性があります。別の候補も確認してみてください。</div>';
     box.innerHTML=html; return;
   }
-  html+='<div class="lab">該当 '+list.length+' 件（同じ薬剤は1つにまとめています。必ずラベルで最終確認を）</div>';
-  list.slice(0,40).forEach(r=>{
-    html+='<div class="dgcand">'+
+  html+='<div class="lab">該当 '+list.length+' 件（同じ薬剤は1つにまとめています。タップで希釈計算・記録／予定へ）</div>';
+  dgState.rxList=list;
+  list.slice(0,40).forEach((r,i)=>{
+    html+='<div class="dgcand" style="cursor:pointer" onclick="openRxRecord('+i+')">'+
       '<div class="nm">'+esc(r.名)+
         '<span class="dgtag">'+esc(r.剤||'')+'</span>'+
         (r.登==='直接'?'<span class="dgtag dgconf-高">直接登録</span>':'<span class="dgtag">グループ</span>')+
@@ -822,6 +837,7 @@ function renderRx(cand, list, box){
         '使用方法：'+esc(r.法||'—')+'<br>'+
         '<span style="color:var(--sub);font-size:.78rem">対象：'+esc(r.虫||'')+'</span>'+
       '</div>'+
+      '<div class="lab" style="color:#1b5e20;font-weight:700;margin-top:6px">▶ タップで希釈計算・記録／予定へ</div>'+
     '</div>';
   });
   if(list.length>40) html+='<div class="lab">ほか '+(list.length-40)+' 件（多すぎる場合は候補名で絞られています）</div>';
@@ -831,6 +847,12 @@ function renderRx(cand, list, box){
 function backToCandidates(){
   const box=document.getElementById('dg_result');
   renderDiagResult({crop:dgState.crop, candidates:dgState.candidates, note:dgState.note}, box);
+}
+/* 診断の農薬一覧 → 既存の散布記録フォームへ引き継いで開く（希釈計算・記録・予定がそのまま使える） */
+function openRxRecord(i){
+  const r=dgState.rxList&&dgState.rxList[i]; if(!r) return;
+  state.crop=dgState.crop; state.slug=dgState.slug; state.data=dgState.master;
+  openSheet(r);   // 既存フォーム（タンク容量プリセット・薬量計算・圃場・記録/予定・写真）
 }
 
 /* ============== 圃場マップ ============== */
