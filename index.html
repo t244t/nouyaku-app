@@ -151,6 +151,19 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   align-items:center;justify-content:center;gap:5px;box-shadow:var(--shadow);flex:1}
 .mapbtn:active{transform:scale(.97)}
 .toolbar{display:flex;gap:8px;margin-top:10px}
+.menu{margin:8px 0 2px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.tile{appearance:none;border:1px solid var(--line);background:var(--card);color:var(--stem-dk);
+  border-radius:13px;padding:12px 6px;font-size:11.5px;font-weight:800;cursor:pointer;text-decoration:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:76px;
+  text-align:center;line-height:1.25;box-shadow:var(--shadow);transition:transform .08s, border-color .15s}
+.tile svg{width:22px;height:22px}
+.tile:active{transform:scale(.97)}
+.tile.accent{border-color:var(--stem);color:var(--stem)}
+.tile.soon{opacity:.52;cursor:default;position:relative;box-shadow:none}
+.tile.soon:active{transform:none}
+.tile .badge{position:absolute;top:5px;right:5px;font-size:8.5px;font-weight:700;color:var(--soft);
+  background:var(--paper);border:1px solid var(--line);border-radius:6px;padding:0 4px}
 
 /* 地図ビュー（全画面オーバーレイ） */
 #mapView{position:fixed;inset:0;z-index:900;background:#2b3a2b;display:none}
@@ -250,38 +263,75 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       <span class="sub">農・みのり</span>
       <span id="demoFlag" class="demoflag" style="margin-left:auto">プレビュー版</span>
     </div>
-    <div class="toolbar">
-      <button class="mapbtn" id="openMap">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>
-        圃場マップ
-      </button>
-      <button class="mapbtn" id="openWork">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        作業報告・予定
-      </button>
-    </div>
-    <div class="toolbar">
-      <a class="mapbtn" href="防除予定.html">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
-        防除予定
-      </a>
-      <a class="mapbtn" href="防除履歴.html">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
-        防除履歴
-      </a>
-    </div>
-    <div class="toolbar">
-      <button class="mapbtn" id="openDiag" style="flex:1;border-color:#2e7d32;color:#1b5e20">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        病害虫を写真で診断
-      </button>
-    </div>
-    <div class="crumbs" id="crumbs">品目を選んでください</div>
   </header>
 
   <div id="alertBar"></div>
 
+  <div class="menu">
+    <div class="eyebrow">防除・診断</div>
+    <div class="tiles">
+      <button class="tile accent" id="openDiag">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>写真で診断</span>
+      </button>
+      <a class="tile" href="防除予定.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+        <span>防除予定</span>
+      </a>
+      <a class="tile" href="防除履歴.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+        <span>防除履歴</span>
+      </a>
+      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
+        <span class="badge">準備中</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-4h12l3 4"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 12h6"/></svg>
+        <span>農薬在庫</span>
+      </button>
+    </div>
+
+    <div class="eyebrow">圃場・作付け</div>
+    <div class="tiles">
+      <button class="tile" id="openMap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>
+        <span>圃場マップ</span>
+      </button>
+      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
+        <span class="badge">準備中</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h9M7 17h4"/></svg>
+        <span>作付け予定</span>
+      </button>
+      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
+        <span class="badge">準備中</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
+        <span>作付け提案</span>
+      </button>
+    </div>
+
+    <div class="eyebrow">作業・資材</div>
+    <div class="tiles">
+      <button class="tile" id="openWork">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>作業報告・予定</span>
+      </button>
+      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
+        <span class="badge">準備中</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17V8h7l3 4h2v5"/></svg>
+        <span>農機具</span>
+      </button>
+    </div>
+
+    <div class="eyebrow">天気</div>
+    <div class="tiles">
+      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
+        <span class="badge">準備中</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3.5 3.5 0 0 1 0 7"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
+        <span>雨雲レーダー</span>
+      </button>
+    </div>
+  </div>
+
   <div class="eyebrow"><span class="n">1</span>品目を選ぶ</div>
+  <div class="crumbs" id="crumbs">品目を選んでください</div>
   <div class="crops" id="crops"></div>
 
   <div class="filter" id="filter">
