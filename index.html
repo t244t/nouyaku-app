@@ -1529,7 +1529,7 @@ function computeAlerts(dl){
   }
   return al;
 }
-let SUM={daily:null, alerts:[], plans:[], wplans:[]};
+let SUM={daily:null, alerts:[], plans:[], wplans:[], cal:[]};
 async function loadAlerts(){
   const bar=document.getElementById('alertBar');
   if(!CONFIG.GAS_URL) return;
@@ -1559,8 +1559,11 @@ async function loadSummaryData(){
     SUM.plans=(j&&j.plans)?j.plans:[]; }catch(e){ SUM.plans=[]; }
   try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWorkPlan&'+new URLSearchParams({状態:'予定',to:td}))).json();
     SUM.wplans=(j&&j.plans)?j.plans:[]; }catch(e){ SUM.wplans=[]; }
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listCalendar')).json();
+    SUM.cal=(j&&j.calendar)?j.calendar:[]; }catch(e){ SUM.cal=[]; }
   renderSummary();
 }
+function calInRange(m,s,e){ if(!s||!e||!m) return false; return (s<=e)?(s<=m&&m<=e):(m>=s||m<=e); }
 function renderSummary(){
   const box=document.getElementById('todaySummary'); if(!box) return;
   const td=todayStr();
@@ -1589,11 +1592,29 @@ function renderSummary(){
   h+='<div class="sumrow link" id="sumWork">🧑‍🌾 作業予定 '+(wkT.length+wkO.length)+'件'+
      ((wkT.length+wkO.length)?'（今日'+wkT.length+'・遅れ'+wkO.length+'）':'（なし）')+
      (workItems?'<div class="sumsub">'+workItems+'</div>':'')+'</div>';
+  // 収穫が近い作物（作付け暦の収穫月から。栽培中に絞る）
+  const nowM=new Date().getMonth()+1, nextM=(nowM%12)+1;
+  let calList=(SUM.cal||[]);
+  if(GROWING.length) calList=calList.filter(c=>GROWING.indexOf(c.作物)>=0);
+  const harvNow=[], harvSoon=[];
+  calList.forEach(function(c){
+    const now=calInRange(nowM,c.収穫開始,c.収穫終了);
+    const soon=calInRange(nextM,c.収穫開始,c.収穫終了);
+    if(now) harvNow.push(c.作物);
+    else if(soon) harvSoon.push(c.作物);
+  });
+  if(harvNow.length||harvSoon.length){
+    const parts=[];
+    if(harvNow.length) parts.push('収穫中：'+harvNow.map(esc).join('・'));
+    if(harvSoon.length) parts.push('まもなく：'+harvSoon.map(esc).join('・'));
+    h+='<div class="sumrow link" id="sumHarv">🌾 収穫が近い作物<div class="sumsub">'+parts.join('　／　')+'</div></div>';
+  }
   h+='<div class="sumrow">🌱 栽培中 '+GROWING.length+'品目'+
      (GROWING.length?'<div class="sumsub">'+GROWING.map(esc).join('・')+'</div>':'')+'</div>';
   h+='</div>';
   box.innerHTML=h;
   const sw=document.getElementById('sumWork'); if(sw) sw.onclick=openWorkForm;
+  const sh2=document.getElementById('sumHarv'); if(sh2) sh2.onclick=openCalendar;
 }
 /* 週間天気の天気アイコン推定（降水量・降水確率・降雪から） */
 function wxIcon(precip, prob, snow){
