@@ -1723,9 +1723,13 @@ function renderGantt(){
     [1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<span class="gm'+(m===nowM?' now':'')+'" style="left:'+((m-1)/12*100)+'%">'+m+'</span>').join('')+
     '</div></div>';
   let rows;
-  if(!list.length){
-    rows='<div class="note" style="padding:18px">表示する作物がありません。'+
-      (calScope==='growing'?'右上の「全品目を表示」に切り替えるか、トップで栽培中の作物を設定してください。':'')+'</div>';
+  if(!CALENDAR.length){
+    rows='<div class="note" style="padding:18px">作付け暦データを取得できませんでした。<br>'+
+      'GASを最新（listCalendar追加版）に差し替えて<b>再デプロイ</b>したか確認してください（デプロイを管理→編集→バージョン：新規→デプロイ）。'+
+      '反映後にこの画面を開き直すと表示されます。</div>';
+  }else if(!list.length){
+    rows='<div class="note" style="padding:18px">栽培中の作物に一致する暦がありません。'+
+      '右上の「全品目を表示」に切り替えるか、トップで栽培中の作物を設定してください。</div>';
   }else{
     rows=list.map(function(c){
       const nowcol='<div class="gnowcol" style="left:'+((nowM-1)/12*100)+'%;width:'+(100/12)+'%"></div>';
