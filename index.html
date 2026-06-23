@@ -90,6 +90,15 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .alert.disease{background:#f0f6ee;border-color:#cfe3c4;color:#3a6b2e}
 .alert.calm{background:#f4f6f4;border-color:var(--line);color:var(--sub)}
 #weekWx{margin:8px 0 2px}
+#todaySummary{margin:6px 0 2px}
+.sumcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow)}
+.sumhd{font-weight:800;font-size:14px;color:var(--stem-dk);margin-bottom:5px}
+.sumwx{font-size:12.5px;color:var(--sub);margin-bottom:8px}
+.sumrow{display:block;font-size:13px;padding:7px 0;border-top:1px solid var(--line);color:var(--ink);text-decoration:none}
+.sumrow.first{border-top:none}
+.sumrow.link{color:var(--stem-dk);font-weight:700;cursor:pointer}
+.sumrow.warn{color:#9a5a1a;font-weight:700}
+.sumsub{font-size:11.5px;color:var(--soft);font-weight:400;margin-top:2px;line-height:1.5}
 .wxhead{font-size:11px;letter-spacing:.12em;color:var(--soft);font-weight:700;margin:6px 2px}
 .wxrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
 .wxday{flex:0 0 auto;width:62px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;box-shadow:var(--shadow)}
@@ -306,6 +315,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       <span id="demoFlag" class="demoflag" style="margin-left:auto">プレビュー版</span>
     </div>
   </header>
+
+  <div id="todaySummary"></div>
 
   <div id="alertBar"></div>
 
@@ -1471,6 +1482,7 @@ function computeAlerts(dl){
   }
   return al;
 }
+let SUM={daily:null, alerts:[], plans:[], wplans:[]};
 async function loadAlerts(){
   const bar=document.getElementById('alertBar');
   if(!CONFIG.GAS_URL) return;
@@ -1479,8 +1491,9 @@ async function loadAlerts(){
     const fc=await res.json();
     if(!fc||!fc.daily) return;
     renderWeek(fc.daily);
+    SUM.daily=fc.daily; SUM.alerts=computeAlerts(fc.daily); renderSummary();
     if(!bar) return;
-    const al=computeAlerts(fc.daily);
+    const al=SUM.alerts;
     if(!al.length){
       bar.innerHTML='<div class="alert calm"><span class="ai">🌤️</span><div>向こう数日、特筆すべき気象の注意はありません。</div></div>';
       return;
@@ -1490,6 +1503,50 @@ async function loadAlerts(){
       '<div><div class="at">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>'
     ).join('');
   }catch(e){ /* 取得失敗時は非表示のまま */ }
+}
+function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+async function loadSummaryData(){
+  if(!CONFIG.GAS_URL) return;
+  const td=todayStr();
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listPlan&'+new URLSearchParams({状態:'予定',to:td}))).json();
+    SUM.plans=(j&&j.plans)?j.plans:[]; }catch(e){ SUM.plans=[]; }
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWorkPlan&'+new URLSearchParams({状態:'予定',to:td}))).json();
+    SUM.wplans=(j&&j.plans)?j.plans:[]; }catch(e){ SUM.wplans=[]; }
+  renderSummary();
+}
+function renderSummary(){
+  const box=document.getElementById('todaySummary'); if(!box) return;
+  const td=todayStr();
+  const dow='日月火水木金土'[new Date().getDay()];
+  let wx='';
+  if(SUM.daily&&SUM.daily.time&&SUM.daily.time.length){
+    const d=SUM.daily;
+    wx=wxIcon(d.precip&&d.precip[0], d.precip_prob&&d.precip_prob[0], d.snow&&d.snow[0])+
+       ' 最高'+Math.round((d.tmax&&d.tmax[0])||0)+'/最低'+Math.round((d.tmin&&d.tmin[0])||0)+'℃'+
+       ' ☂'+((d.precip_prob&&d.precip_prob[0]!=null)?d.precip_prob[0]:'–')+'%'+
+       ' 風'+Math.round((d.wind&&d.wind[0])||0)+'m/s';
+  }
+  const spT=SUM.plans.filter(p=>p['予定日']===td), spO=SUM.plans.filter(p=>p['予定日']<td);
+  const wkT=SUM.wplans.filter(p=>p['予定日']===td), wkO=SUM.wplans.filter(p=>p['予定日']<td);
+  const sprayItems=SUM.plans.slice(0,3).map(p=>esc(p['品目']||'')+'／'+esc(p['対象']||'')+'　'+esc(p['農薬名']||'')+'（'+esc(p['予定日']||'')+(p['予定日']<td?' 遅れ':'')+'）').join('<br>');
+  const workItems=SUM.wplans.slice(0,3).map(p=>esc(p['カテゴリ']||'')+'／'+esc(p['作業内容']||'')+'　'+esc(p['圃場']||'')+'（'+esc(p['予定日']||'')+(p['予定日']<td?' 遅れ':'')+'）').join('<br>');
+
+  let h='<div class="sumcard">';
+  h+='<div class="sumhd">今日の状況　'+md(td)+'（'+dow+'）</div>';
+  if(wx) h+='<div class="sumwx">'+wx+'</div>';
+  if(SUM.alerts.length)
+    h+='<div class="sumrow warn first">⚠️ 気象の注意 '+SUM.alerts.length+'件（下のアラート参照）</div>';
+  h+='<a class="sumrow link'+(SUM.alerts.length?'':' first')+'" href="防除予定.html">🧴 防除予定 '+(spT.length+spO.length)+'件'+
+     ((spT.length+spO.length)?'（今日'+spT.length+'・遅れ'+spO.length+'）':'（なし）')+
+     (sprayItems?'<div class="sumsub">'+sprayItems+'</div>':'')+'</a>';
+  h+='<div class="sumrow link" id="sumWork">🧑‍🌾 作業予定 '+(wkT.length+wkO.length)+'件'+
+     ((wkT.length+wkO.length)?'（今日'+wkT.length+'・遅れ'+wkO.length+'）':'（なし）')+
+     (workItems?'<div class="sumsub">'+workItems+'</div>':'')+'</div>';
+  h+='<div class="sumrow">🌱 栽培中 '+GROWING.length+'品目'+
+     (GROWING.length?'<div class="sumsub">'+GROWING.map(esc).join('・')+'</div>':'')+'</div>';
+  h+='</div>';
+  box.innerHTML=h;
+  const sw=document.getElementById('sumWork'); if(sw) sw.onclick=openWorkForm;
 }
 /* 週間天気の天気アイコン推定（降水量・降水確率・降雪から） */
 function wxIcon(precip, prob, snow){
@@ -1522,6 +1579,7 @@ function renderWeek(dl){
   box.innerHTML=h;
 }
 loadAlerts();
+loadSummaryData();
 
 /* ============== 栽培中の作物（全体把握・第一段階） ============== */
 let GROWING=[];
@@ -1547,6 +1605,7 @@ async function loadGrowing(){
       GROWING=(j&&j.crops)?j.crops:[]; }catch(e){ GROWING=[]; }
   }
   renderGrowBox(); markGrowing();
+  renderSummary();
 }
 function openGrowEdit(){
   const sel=new Set(GROWING);
