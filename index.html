@@ -91,6 +91,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .alert.calm{background:#f4f6f4;border-color:var(--line);color:var(--sub)}
 #weekWx{margin:8px 0 2px}
 #todaySummary{margin:6px 0 2px}
+#recBar{margin:6px 0 2px}
+.recbar{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 11px}
+.recbar b{color:var(--stem-dk)}
+.recbar .rset{margin-left:auto;appearance:none;border:1px solid var(--line);background:var(--paper);color:var(--stem-dk);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer}
+.recbar.unset{background:#fff8e8;border-color:#f0dca8;color:#8a5a00}
+.recbar.unset .rset{border-color:#e0b94a;color:#8a5a00}
+#rScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#rScrim.show{opacity:1;pointer-events:auto}
+#rSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#rSheet.show{transform:translateY(0)}
 .sumcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;box-shadow:var(--shadow)}
 .sumhd{font-weight:800;font-size:14px;color:var(--stem-dk);margin-bottom:5px}
 .sumwx{font-size:12.5px;color:var(--sub);margin-bottom:8px}
@@ -348,6 +358,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 
   <div id="todaySummary"></div>
 
+  <div id="recBar"></div>
+
   <div id="alertBar"></div>
 
   <div id="weekWx"></div>
@@ -486,6 +498,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="cScrim"></div>
 <div id="cSheet"><div class="grab"></div><div class="sheet-in" id="cSheetIn"></div></div>
+
+<div id="rScrim"></div>
+<div id="rSheet"><div class="grab"></div><div class="sheet-in" id="rSheetIn"></div></div>
 
 <script>
 /* ============== 設定（デプロイ時に書き換え） ============== */
@@ -739,7 +754,7 @@ document.getElementById('scrim').onclick=closeSheet;
 function saveRecord(){
   const r=state.current;
   const rec={
-    line_user:CONFIG.LINE_USER, 品目:state.crop, 農薬名:r.名, 区分:r.区,
+    line_user:CONFIG.LINE_USER, 記録者:RECORDER, 品目:state.crop, 農薬名:r.名, 区分:r.区,
     対象:r.虫, 圃場:document.getElementById('field').value,
     散布日:document.getElementById('date').value, 使用量:document.getElementById('amt').value,
     希釈:r.希, 登録番号:r.番, メモ:document.getElementById('memo').value
@@ -830,7 +845,7 @@ async function uploadPhotos(recordId){
 function savePlan(){
   const r=state.current;
   const plan={
-    line_user:CONFIG.LINE_USER, 品目:state.crop, 農薬名:r.名, 登録番号:r.番,
+    line_user:CONFIG.LINE_USER, 記録者:RECORDER, 品目:state.crop, 農薬名:r.名, 登録番号:r.番,
     区分:r.区, 対象:r.虫, 希釈:r.希,
     予定日:document.getElementById('date').value,
     圃場:document.getElementById('field').value,
@@ -1255,7 +1270,7 @@ function workHistoryHtml(){
   if(!workHistory.length) return '<div class="note">まだ作業記録はありません。</div>';
   return '<div class="whist">'+workHistory.map(function(r){
     const d=String(r['作業日']||'').slice(0,10);
-    const sub=[r['圃場'], r['時間'], r['メモ']].filter(function(x){return x;}).map(esc).join(' / ');
+    const sub=[r['圃場'], r['時間'], r['記録者']?('記録者:'+r['記録者']):'', r['メモ']].filter(function(x){return x;}).map(esc).join(' / ');
     const id=esc(r['作業ID']||'');
     return '<div class="whrow"><div class="whd">'+esc(d)+'</div>'+
       '<div class="whmain"><b>'+esc(r['カテゴリ']||'')+'</b> '+esc(r['作業内容']||'')+
@@ -1360,7 +1375,7 @@ function savePlanWork(){
   if(!content){ toast('作業内容を選ぶか入力してください'); return; }
   const date=valOf('w_date'); if(!date){ toast('予定日（作業日欄）を選んでください'); return; }
   if(!CONFIG.GAS_URL){ toast('GAS未接続のため保存できません'); return; }
-  const plan={line_user:CONFIG.LINE_USER, 圃場:valOf('w_field'), 予定日:date,
+  const plan={line_user:CONFIG.LINE_USER, 記録者:RECORDER, 圃場:valOf('w_field'), 予定日:date,
     カテゴリ:workCat, 作業内容:content, メモ:valOf('w_memo')};
   const url=CONFIG.GAS_URL+'?action=addWorkPlan&'+new URLSearchParams(plan).toString();
   const btn=document.getElementById('w_plan'); if(guardBtn(btn)===false) return;
@@ -1384,7 +1399,7 @@ function saveWork(){
   const content=currentWorkContent();
   if(!content){ toast('作業内容を選ぶか入力してください'); return; }
   if(!CONFIG.GAS_URL){ toast('GAS未接続のため保存できません'); return; }
-  const rec={line_user:CONFIG.LINE_USER, 圃場:valOf('w_field'), 作業日:valOf('w_date'),
+  const rec={line_user:CONFIG.LINE_USER, 記録者:RECORDER, 圃場:valOf('w_field'), 作業日:valOf('w_date'),
     カテゴリ:workCat, 作業内容:content, 時間:valOf('w_hours'), メモ:valOf('w_memo')};
   const btn=document.getElementById('w_save'); if(guardBtn(btn)===false) return;
 
@@ -1718,6 +1733,43 @@ document.getElementById('calScopeBtn').onclick=()=>{
   renderGantt();
 };
 document.getElementById('cScrim').onclick=closeCalEdit;
+
+/* ============== 記録者（この端末の名前。記録・予定に付与） ============== */
+let RECORDER='';
+try{ RECORDER=localStorage.getItem('nouminori_user')||''; }catch(e){ RECORDER=''; }
+function renderRecorder(){
+  const box=document.getElementById('recBar'); if(!box) return;
+  if(RECORDER){
+    box.innerHTML='<div class="recbar">👤 記録者：<b>'+esc(RECORDER)+'</b><button class="rset" id="recSet">変更</button></div>';
+  }else{
+    box.innerHTML='<div class="recbar unset">👤 記録者が未設定です（記録に名前が残りません）<button class="rset" id="recSet">設定</button></div>';
+  }
+  const b=document.getElementById('recSet'); if(b) b.onclick=openRecorderEdit;
+}
+function openRecorderEdit(){
+  document.getElementById('rSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">記録者の名前</div></div>'+
+    '<div class="rec"><div style="color:var(--soft);font-size:.82rem;margin-bottom:10px">この端末で記録・予定を登録したときに残る名前です。家族・従業員それぞれのスマホで一度設定してください。</div>'+
+    '<div class="field"><label>名前</label><input id="recInput" placeholder="例：太郎、お父さん、田中" value="'+esc(RECORDER)+'"></div>'+
+    '<button class="save" id="recSave">保存</button></div>';
+  document.getElementById('recSave').onclick=saveRecorderName;
+  document.getElementById('rScrim').classList.add('show');
+  document.getElementById('rSheet').classList.add('show');
+  setTimeout(function(){ const i=document.getElementById('recInput'); if(i) i.focus(); },140);
+}
+function closeRecorderEdit(){
+  document.getElementById('rScrim').classList.remove('show');
+  document.getElementById('rSheet').classList.remove('show');
+}
+function saveRecorderName(){
+  const v=(document.getElementById('recInput').value||'').trim();
+  RECORDER=v;
+  try{ localStorage.setItem('nouminori_user', v); }catch(e){}
+  renderRecorder(); closeRecorderEdit();
+  toast(v?('記録者を「'+v+'」にしました'):'記録者を未設定にしました');
+}
+document.getElementById('rScrim').onclick=closeRecorderEdit;
+renderRecorder();
 async function openCalendar(){
   document.getElementById('calView').classList.add('show');
   if(!CALENDAR.length) await loadCalendar();
