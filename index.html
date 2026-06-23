@@ -219,6 +219,36 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 /* 地図ビュー（全画面オーバーレイ） */
 #mapView{position:fixed;inset:0;z-index:900;background:#2b3a2b;display:none}
 #mapView.show{display:block}
+#calView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#calView.show{display:flex}
+.calhead{display:flex;align-items:center;gap:10px;padding:14px 14px 8px;border-bottom:1px solid var(--line)}
+.calhead h2{font-size:16px;margin:0;color:var(--stem-dk);flex:1}
+.calhead .mclose,.calhead .maddbtn{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--stem-dk);cursor:pointer}
+.callegend{display:flex;gap:14px;padding:8px 14px;font-size:11.5px;color:var(--sub);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.lgbar{display:inline-block;width:16px;height:8px;border-radius:3px;vertical-align:middle;margin-right:4px}
+.calbody{flex:1;overflow:auto;padding:8px 8px 40px}
+.ganttgrid{min-width:520px}
+.grow{display:flex;align-items:stretch;border-bottom:1px solid var(--line)}
+.grow:not(.ghdr){cursor:pointer}
+.grow:not(.ghdr):active{background:#eef3ec}
+.glabel{flex:0 0 84px;position:sticky;left:0;background:var(--paper);z-index:2;display:flex;align-items:center;padding:0 8px;font-size:12.5px;font-weight:700;color:var(--ink);border-right:1px solid var(--line);min-height:40px}
+.gtrack{position:relative;flex:1;min-height:40px;background:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/12 - 1px),var(--line) calc(100%/12 - 1px),var(--line) calc(100%/12))}
+.ghdr .gtrack,.ghdr .glabel{min-height:24px}
+.ghdr .glabel{font-size:11px;color:var(--soft)}
+.gm{position:absolute;top:4px;transform:translateX(-50%);margin-left:calc(100%/24);font-size:10.5px;color:var(--soft)}
+.gm.now{color:#c0392b;font-weight:800}
+.gnowcol{position:absolute;top:0;bottom:0;background:rgba(192,57,43,.07)}
+.gbar{position:absolute;height:8px;border-radius:4px}
+.gbar.nae{background:#a5d6a7}
+.gbar.tei{background:#43a047}
+.gbar.shu{background:#f9a825}
+#cScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#cScrim.show{opacity:1;pointer-events:auto}
+#cSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#cSheet.show{transform:translateY(0)}
+.caledit{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.caledit label{font-size:11px;color:var(--soft);display:block;margin-bottom:3px;font-weight:700}
+.caledit select{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff}
 #map{position:absolute;inset:0}
 .leaflet-tile{filter:contrast(1.04) saturate(1.02)}
 .leaflet-container{background:#2b3a2b;font-family:inherit}
@@ -350,10 +380,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3 3 6v15l6-3 6 3 6-3V3l-6 3-6-3Z"/><path d="M9 3v15M15 6v15"/></svg>
         <span>圃場マップ</span>
       </button>
-      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
-        <span class="badge">準備中</span>
+      <button class="tile" id="openCal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h9M7 17h4"/></svg>
-        <span>作付け予定</span>
+        <span>作付け暦</span>
       </button>
       <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
         <span class="badge">準備中</span>
@@ -439,6 +468,24 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 
 <div id="gScrim"></div>
 <div id="gSheet"><div class="grab"></div><div class="sheet-in" id="gSheetIn"></div></div>
+
+<div id="calView">
+  <div class="calhead">
+    <h2>作付け暦</h2>
+    <button class="maddbtn" id="calScopeBtn">全品目を表示</button>
+    <button class="mclose" id="calCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend">
+    <span><span class="lgbar" style="background:#a5d6a7"></span>育苗</span>
+    <span><span class="lgbar" style="background:#43a047"></span>定植</span>
+    <span><span class="lgbar" style="background:#f9a825"></span>収穫</span>
+    <span style="color:#c0392b">縦の赤帯＝今月</span>
+    <span style="color:var(--soft)">行をタップで時期を編集</span>
+  </div>
+  <div id="calBody" class="calbody"></div>
+</div>
+<div id="cScrim"></div>
+<div id="cSheet"><div class="grab"></div><div class="sheet-in" id="cSheetIn"></div></div>
 
 <script>
 /* ============== 設定（デプロイ時に書き換え） ============== */
@@ -1639,6 +1686,100 @@ async function saveGrowingNow(){
 }
 document.getElementById('gScrim').onclick=closeGrowEdit;
 loadGrowing();
+
+/* ============== 作付け暦ガントチャート ============== */
+let CALENDAR=[], calScope='growing';
+document.getElementById('openCal').onclick=openCalendar;
+document.getElementById('calCloseBtn').onclick=()=>document.getElementById('calView').classList.remove('show');
+document.getElementById('calScopeBtn').onclick=()=>{
+  calScope=(calScope==='growing')?'all':'growing';
+  document.getElementById('calScopeBtn').textContent=(calScope==='growing')?'全品目を表示':'栽培中のみ表示';
+  renderGantt();
+};
+document.getElementById('cScrim').onclick=closeCalEdit;
+async function openCalendar(){
+  document.getElementById('calView').classList.add('show');
+  if(!CALENDAR.length) await loadCalendar();
+  renderGantt();
+}
+async function loadCalendar(){
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listCalendar')).json();
+    CALENDAR=(j&&j.calendar)?j.calendar:[]; }catch(e){ CALENDAR=[]; }
+}
+function calSegs(s,e){ if(!s||!e) return []; return (s<=e)?[[s,e]]:[[s,12],[1,e]]; }
+function calBar(cls,s,e,top){
+  return calSegs(s,e).map(function(seg){
+    const left=((seg[0]-1)/12*100), w=((seg[1]-seg[0]+1)/12*100);
+    return '<div class="gbar '+cls+'" style="left:'+left+'%;width:'+w+'%;top:'+top+'px"></div>';
+  }).join('');
+}
+function renderGantt(){
+  const body=document.getElementById('calBody'); if(!body) return;
+  let list=CALENDAR.slice();
+  if(calScope==='growing' && GROWING.length) list=list.filter(c=>GROWING.indexOf(c.作物)>=0);
+  const nowM=new Date().getMonth()+1;
+  const head='<div class="grow ghdr"><div class="glabel">作物</div><div class="gtrack">'+
+    [1,2,3,4,5,6,7,8,9,10,11,12].map(m=>'<span class="gm'+(m===nowM?' now':'')+'" style="left:'+((m-1)/12*100)+'%">'+m+'</span>').join('')+
+    '</div></div>';
+  let rows;
+  if(!list.length){
+    rows='<div class="note" style="padding:18px">表示する作物がありません。'+
+      (calScope==='growing'?'右上の「全品目を表示」に切り替えるか、トップで栽培中の作物を設定してください。':'')+'</div>';
+  }else{
+    rows=list.map(function(c){
+      const nowcol='<div class="gnowcol" style="left:'+((nowM-1)/12*100)+'%;width:'+(100/12)+'%"></div>';
+      return '<div class="grow" onclick="openCalEdit(\''+esc(c.作物)+'\')">'+
+        '<div class="glabel">'+esc(c.作物)+'</div>'+
+        '<div class="gtrack">'+nowcol+
+          calBar('nae',c.育苗開始,c.育苗終了,5)+
+          calBar('tei',c.定植開始,c.定植終了,16)+
+          calBar('shu',c.収穫開始,c.収穫終了,27)+
+        '</div></div>';
+    }).join('');
+  }
+  body.innerHTML='<div class="ganttgrid">'+head+rows+'</div>';
+}
+function calMonthOpts(v){ let o='<option value="0">—</option>'; for(let m=1;m<=12;m++) o+='<option value="'+m+'"'+(v===m?' selected':'')+'>'+m+'月</option>'; return o; }
+function openCalEdit(crop){
+  const c=CALENDAR.find(x=>x.作物===crop)||{作物:crop,育苗開始:0,育苗終了:0,定植開始:0,定植終了:0,収穫開始:0,収穫終了:0};
+  document.getElementById('cSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">'+esc(crop)+' の作付け時期</div></div>'+
+    '<div class="rec"><div class="caledit">'+
+      '<div><label>育苗 開始</label><select id="ce_ns">'+calMonthOpts(c.育苗開始)+'</select></div>'+
+      '<div><label>育苗 終了</label><select id="ce_ne">'+calMonthOpts(c.育苗終了)+'</select></div>'+
+      '<div><label>定植 開始</label><select id="ce_ts">'+calMonthOpts(c.定植開始)+'</select></div>'+
+      '<div><label>定植 終了</label><select id="ce_te">'+calMonthOpts(c.定植終了)+'</select></div>'+
+      '<div><label>収穫 開始</label><select id="ce_hs">'+calMonthOpts(c.収穫開始)+'</select></div>'+
+      '<div><label>収穫 終了</label><select id="ce_he">'+calMonthOpts(c.収穫終了)+'</select></div>'+
+    '</div>'+
+    '<div class="note">使わない工程は「—」にすると、その帯は表示されません（直播きなら育苗を—に）。収穫が年をまたぐ場合（例：11月開始→3月終了）もそのまま設定できます。</div>'+
+    '<button class="save" id="ce_save">保存</button></div>';
+  document.getElementById('ce_save').onclick=()=>saveCalEdit(crop);
+  document.getElementById('cScrim').classList.add('show');
+  document.getElementById('cSheet').classList.add('show');
+}
+function closeCalEdit(){
+  document.getElementById('cScrim').classList.remove('show');
+  document.getElementById('cSheet').classList.remove('show');
+}
+async function saveCalEdit(crop){
+  const g=id=>Number(document.getElementById(id).value)||0;
+  const body={作物:crop, 育苗開始:g('ce_ns'),育苗終了:g('ce_ne'),
+    定植開始:g('ce_ts'),定植終了:g('ce_te'),収穫開始:g('ce_hs'),収穫終了:g('ce_he')};
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const btn=document.getElementById('ce_save'); if(guardBtn(btn)===false) return;
+  try{
+    const u=CONFIG.GAS_URL+'?action=saveCalendar&'+new URLSearchParams(body).toString();
+    const j=await (await fetch(u)).json();
+    if(j&&j.ok){
+      const i=CALENDAR.findIndex(x=>x.作物===crop);
+      if(i>=0) CALENDAR[i]=body; else CALENDAR.push(body);
+      renderGantt(); closeCalEdit(); toast('作付け時期を保存しました');
+    }else toast('保存に失敗しました');
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
 
 
 </script>
