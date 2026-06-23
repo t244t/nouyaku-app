@@ -133,7 +133,7 @@
           <th>散布日</th><th>圃場</th><th>品目</th><th>農薬名</th>
           <th>登録番号</th><th>区分</th><th>対象</th><th>希釈</th>
           <th>使用量</th><th>使用回数<br>(今期/上限)</th><th>収穫前<br>日数</th>
-          <th>収穫可能日</th><th>写真</th><th>メモ</th>
+          <th>収穫可能日</th><th>写真</th><th>メモ</th><th>記録者</th>
         </tr>
       </thead>
       <tbody id="tbody"></tbody>
@@ -345,7 +345,7 @@ function render(rows){
       '<td class="num">'+esc(phi)+'</td>' +
       '<td class="num">'+esc(r._harvestOk||'')+'</td>' +
       photoCell(String(r.記録ID||'')) +
-      td(r.メモ);
+      td(r.メモ) + td(r.記録者||'');
     tb.appendChild(tr);
   });
   $('empty').style.display = rows.length ? 'none' : 'block';
@@ -373,7 +373,7 @@ function updateMeta(count, overCnt){
 function downloadCsv(){
   if(!CURRENT.length){ alert('出力する記録がありません。'); return; }
   const head = ['散布日','圃場','品目','農薬名','登録番号','区分','対象','希釈','使用量',
-                '今期使用回数','使用回数上限','収穫前日数','収穫可能日','判定','写真URL','メモ'];
+                '今期使用回数','使用回数上限','収穫前日数','収穫可能日','判定','写真URL','メモ','記録者'];
   const judgeJp = { over:'超過', limit:'上限到達', ok:'' };
   const lines = [ head.map(csvCell).join(',') ];
   CURRENT.forEach(function(r){
@@ -386,7 +386,8 @@ function downloadCsv(){
       r._harvestOk || '',
       judgeJp[r._judge] || '',
       ph,
-      r.メモ
+      r.メモ,
+      r.記録者 || ''
     ].map(csvCell).join(','));
   });
   const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type:'text/csv;charset=utf-8;' });
