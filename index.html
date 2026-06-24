@@ -229,6 +229,15 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 /* 地図ビュー（全画面オーバーレイ） */
 #mapView{position:fixed;inset:0;z-index:900;background:#2b3a2b;display:none}
 #mapView.show{display:block}
+#polyBar{position:absolute;left:0;right:0;bottom:0;z-index:1200;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);display:none;box-shadow:0 -6px 24px rgba(24,35,26,.18)}
+#polyBar.show{display:block}
+#polyBar .pbtitle{font-size:13.5px;font-weight:800;color:var(--stem-dk)}
+#polyBar .pbcount{margin-left:8px;font-size:12px;color:var(--soft);font-weight:700}
+#polyBar .pbmsg{font-size:12px;color:var(--sub);margin:4px 0 8px}
+#polyBar .pbbtns{display:flex;gap:7px}
+#polyBar .pbbtns button{flex:1;appearance:none;border:1px solid var(--line);background:#fff;color:var(--stem-dk);border-radius:9px;padding:9px 6px;font-size:12.5px;font-weight:700;cursor:pointer}
+#polyBar .pbbtns button.prim{background:var(--stem);color:#fff;border-color:var(--stem)}
+#polyBar .pbbtns button:active{opacity:.85}
 #calView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #calView.show{display:flex}
 #plantView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
@@ -506,6 +515,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <div class="mlegend">
       <span class="lg"><span class="dot done"></span><span class="done-t">除草済み</span></span>
       <span class="lg"><span class="dot todo"></span><span class="todo-t">未処理</span></span>
+    </div>
+  </div>
+  <div id="polyBar">
+    <div class="pbtitle">区画を編集中：<b id="polyName"></b><span id="polyCount" class="pbcount"></span></div>
+    <div class="pbmsg">地図をタップして畑の角を順になぞってください（3点以上）。</div>
+    <div class="pbbtns">
+      <button id="polyUndo">ひとつ戻す</button>
+      <button id="polyClear">やり直し</button>
+      <button id="polyCancel">キャンセル</button>
+      <button id="polySave" class="prim">保存</button>
     </div>
   </div>
   <button class="locate" id="locate" title="現在地">
@@ -1147,6 +1166,80 @@ function makeSquare(lat,lon,area){
   const dlat=half/111320, dlon=half/(111320*Math.cos(lat*Math.PI/180));
   return [[lat-dlat,lon-dlon],[lat-dlat,lon+dlon],[lat+dlat,lon+dlon],[lat+dlat,lon-dlon]];
 }
+function parseRing(s){
+  if(!s) return null;
+  try{ const a=(typeof s==='string')?JSON.parse(s):s;
+    if(Array.isArray(a)&&a.length>=3 && a.every(p=>Array.isArray(p)&&p.length===2&&isFinite(p[0])&&isFinite(p[1]))) return a;
+  }catch(e){}
+  return null;
+}
+function fieldRing(f){ return parseRing(f['区画']) || makeSquare(f.lat,f.lon,f.area); }
+
+/* ============== 区画の描画編集 ============== */
+let polyEdit=null; // {field, pts:[[lat,lng]...], layer, markers, onClick}
+function startPolyEdit(f){
+  closeFieldSheet();
+  const existing=parseRing(f['区画']);
+  polyEdit={ field:f, pts: existing? existing.slice() : [], layer:null, markers:[] };
+  document.getElementById('polyName').textContent=f.name;
+  document.getElementById('polyBar').classList.add('show');
+  // 既存区画があればその範囲へズーム、なければ中心へ寄る
+  try{
+    if(existing&&existing.length>=3){ mapObj.fitBounds(existing,{padding:[60,60]}); }
+    else { mapObj.setView([f.lat,f.lon], Math.max(mapObj.getZoom(),18)); }
+  }catch(e){}
+  polyEdit.onClick=function(e){ polyEdit.pts.push([e.latlng.lat,e.latlng.lng]); redrawPolyEdit(); };
+  mapObj.on('click', polyEdit.onClick);
+  redrawPolyEdit();
+}
+function redrawPolyEdit(){
+  if(!polyEdit) return;
+  if(polyEdit.layer){ mapObj.removeLayer(polyEdit.layer); }
+  polyEdit.markers.forEach(m=>mapObj.removeLayer(m)); polyEdit.markers=[];
+  const pts=polyEdit.pts;
+  polyEdit.layer=L.layerGroup().addTo(mapObj);
+  if(pts.length>=2){
+    const shape = pts.length>=3 ? L.polygon(pts,{color:'#f0a500',weight:3,fillColor:'#f0a500',fillOpacity:.22})
+                                : L.polyline(pts,{color:'#f0a500',weight:3});
+    shape.addTo(polyEdit.layer);
+  }
+  pts.forEach((p,i)=>{
+    const mk=L.marker(p,{icon:L.divIcon({className:'',html:'<div style="width:12px;height:12px;border-radius:50%;background:#f0a500;border:2px solid #fff;box-shadow:0 0 0 1px #00000033"></div>',iconSize:[12,12]})}).addTo(polyEdit.layer);
+    polyEdit.markers.push(mk);
+  });
+  document.getElementById('polyCount').textContent=pts.length+'点';
+}
+function endPolyEdit(){
+  if(!polyEdit) return;
+  mapObj.off('click', polyEdit.onClick);
+  if(polyEdit.layer){ mapObj.removeLayer(polyEdit.layer); }
+  polyEdit.markers.forEach(m=>mapObj.removeLayer(m));
+  polyEdit=null;
+  document.getElementById('polyBar').classList.remove('show');
+}
+document.getElementById('polyUndo').onclick=function(){ if(polyEdit&&polyEdit.pts.length){ polyEdit.pts.pop(); redrawPolyEdit(); } };
+document.getElementById('polyClear').onclick=function(){ if(polyEdit){ polyEdit.pts=[]; redrawPolyEdit(); } };
+document.getElementById('polyCancel').onclick=function(){ endPolyEdit(); };
+document.getElementById('polySave').onclick=async function(){
+  if(!polyEdit) return;
+  if(polyEdit.pts.length<3){ toast('3点以上で囲んでください'); return; }
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const f=polyEdit.field;
+  const ring=polyEdit.pts.map(p=>[ +p[0].toFixed(6), +p[1].toFixed(6) ]);
+  const btn=document.getElementById('polySave'); if(guardBtn(btn)===false) return;
+  try{
+    const u=CONFIG.GAS_URL+'?action=updateFieldPoly&'+new URLSearchParams({圃場名:f.name, 区画:JSON.stringify(ring)});
+    const j=await (await fetch(u)).json();
+    if(j&&j.ok){
+      // ローカル反映
+      const t=fieldList.find(x=>x.name===f.name); if(t) t['区画']=JSON.stringify(ring);
+      endPolyEdit();
+      buildLayers();
+      toast('区画を保存しました');
+    }else toast('保存に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+};
 
 async function loadFieldStatus(){
   mapStatus={}; mapRecords=[]; mapWorkRecords=[];
@@ -1188,7 +1281,7 @@ async function loadFields(){
       if(j&&j.fields&&j.fields.length){
         list=j.fields.map(f=>({name:String(f['圃場名']),lat:Number(f['緯度']),lon:Number(f['経度']),
           area:Number(f['面積'])||0, '所有':f['所有']||'', '所有者':f['所有者']||'',
-          '栽培作物':f['栽培作物']||'', '住所':f['住所']||'', '備考':f['備考']||''}));
+          '栽培作物':f['栽培作物']||'', '住所':f['住所']||'', '備考':f['備考']||'', '区画':f['区画']||''}));
       }
     }catch(e){}
   }
@@ -1203,7 +1296,7 @@ function buildLayers(){
   const bounds=[];
   fieldList.forEach(f=>{
     if(!f.lat||!f.lon) return;
-    const ring=makeSquare(f.lat,f.lon,f.area);
+    const ring=fieldRing(f);
     const poly=L.polygon(ring, fStyle(f.name)).addTo(fieldLayer);
     poly.on('click',()=>openField(f));
     layerByName[f.name]=poly;
@@ -1247,6 +1340,7 @@ function openField(f){
       '<div><span>所有者</span>'+meta('所有者')+'</div></div>'+
     '<div class="weed" style="margin-top:9px"><div class="t">住所</div><div class="v" style="font-size:13px">'+(f['住所']?esc(f['住所']):'—')+'</div></div>'+
     (f['備考']?('<div class="weed" style="margin-top:9px"><div class="t">備考</div><div class="v" style="font-size:13px">'+esc(f['備考'])+'</div></div>'):'')+
+    '<button class="mapbtn" id="fEditPoly" style="width:100%;margin-top:10px">✏️ 区画の形を編集（地図をなぞる）</button>'+
     '<div class="frecent"><div class="t">直近の作業（散布・作業報告）</div>'+
     (recent.length?recent.map(r=>'<div class="frow"><div><span class="b '+r.cls+'">'+esc(r.badge)+'</span>'+esc(r.nm||'—')+'</div><div class="dt">'+fmtD(r.d)+'</div></div>').join(''):'<div class="fempty">この圃場の作業記録はまだありません。</div>')+
     '</div>';
@@ -1254,6 +1348,7 @@ function openField(f){
   document.getElementById('fSheet').classList.add('show');
   Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5}));
   if(layerByName[name]) layerByName[name].setStyle({weight:5});
+  const eb=document.getElementById('fEditPoly'); if(eb) eb.onclick=()=>startPolyEdit(f);
 }
 
 function closeFieldSheet(){ document.getElementById('fScrim').classList.remove('show'); document.getElementById('fSheet').classList.remove('show'); Object.values(layerByName).forEach(l=>l.setStyle&&l.setStyle({weight:2.5})); }
