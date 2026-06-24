@@ -1853,7 +1853,10 @@ function openGuideEdit(){
   const g=guideOf(guideCrop)||{作物:guideCrop,播種:'',定植:'',収穫:'',ポイント:''};
   document.getElementById('gdSheetIn').innerHTML=
     '<div class="fh"><div class="nm">'+esc(guideCrop)+' の育てガイド</div></div>'+
-    '<div class="rec"><div class="gdedit-grid">'+
+    '<div class="rec">'+
+    '<button class="mapbtn" id="gd_ai" style="width:100%;margin-bottom:4px">🤖 AIに下書きを作ってもらう</button>'+
+    '<div class="note" style="margin-top:6px">AIの下書きは一般的な目安です。糸島・あにきのやり方に直してから保存してください。</div>'+
+    '<div class="gdedit-grid">'+
       '<label>🌱 播種</label><textarea id="gd_sow">'+esc(g.播種||'')+'</textarea>'+
       '<label>🪴 定植</label><textarea id="gd_plant">'+esc(g.定植||'')+'</textarea>'+
       '<label>🌾 収穫</label><textarea id="gd_harvest">'+esc(g.収穫||'')+'</textarea>'+
@@ -1862,8 +1865,26 @@ function openGuideEdit(){
     '<div class="note">糸島・あにきのやり方に合わせて自由に書き換えてください。空欄でも保存できます。</div>'+
     '<button class="save" id="gd_save">保存</button></div>';
   document.getElementById('gd_save').onclick=saveGuideNow;
+  const ai=document.getElementById('gd_ai'); if(ai) ai.onclick=askGuideAI;
   document.getElementById('gdScrim').classList.add('show');
   document.getElementById('gdSheet').classList.add('show');
+}
+function setTA(id,v){ const e=document.getElementById(id); if(e) e.value=(v==null?'':v); }
+async function askGuideAI(){
+  const ids=['gd_sow','gd_plant','gd_harvest','gd_point'];
+  const hasContent=ids.some(id=>pvId(id).trim());
+  if(hasContent && !confirm('AIの下書きで各項目を置き換えます。今の内容は上書きされます。よろしいですか？')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const btn=document.getElementById('gd_ai'); if(guardBtn(btn)===false) return;
+  btn.textContent='AIが下書き中…';
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=guideAI&'+new URLSearchParams({作物:guideCrop}))).json();
+    if(j&&j.ok){
+      setTA('gd_sow',j.播種); setTA('gd_plant',j.定植); setTA('gd_harvest',j.収穫); setTA('gd_point',j.ポイント);
+      toast('AIの下書きを入れました。手直しして保存してください');
+    }else toast('AI生成に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('AI生成に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
 }
 function closeGuideEdit(){
   document.getElementById('gdScrim').classList.remove('show');
