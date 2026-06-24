@@ -235,10 +235,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #plantView.show{display:flex}
 #guideView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #guideView.show{display:flex}
-.gdcrops{display:flex;flex-wrap:wrap;gap:8px;padding:12px}
+.gdcrops{display:flex;flex-wrap:wrap;gap:8px;padding:12px;flex:0 0 auto;max-height:34vh;overflow:auto;border-bottom:1px solid var(--line)}
 .gdchip{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 15px;font-size:13.5px;font-weight:700;color:var(--stem-dk);cursor:pointer}
 .gdchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
-.gdbody{padding:4px 12px 40px}
+.gdbody{padding:4px 12px 40px;flex:1 1 auto;overflow:auto}
 .gdsec{border:1px solid var(--line);border-radius:12px;margin:10px 0;background:var(--card);overflow:hidden}
 .gdsec h4{margin:0;padding:9px 13px;font-size:13px;background:var(--wash,#eef3ec);color:var(--stem-dk);display:flex;align-items:center;gap:7px}
 .gdsec .gdtext{padding:11px 13px;font-size:13.5px;line-height:1.75;color:var(--ink);white-space:pre-wrap}
