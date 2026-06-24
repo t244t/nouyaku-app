@@ -233,6 +233,23 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #calView.show{display:flex}
 #plantView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #plantView.show{display:flex}
+#guideView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#guideView.show{display:flex}
+.gdcrops{display:flex;flex-wrap:wrap;gap:8px;padding:12px}
+.gdchip{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 15px;font-size:13.5px;font-weight:700;color:var(--stem-dk);cursor:pointer}
+.gdchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
+.gdbody{padding:4px 12px 40px}
+.gdsec{border:1px solid var(--line);border-radius:12px;margin:10px 0;background:var(--card);overflow:hidden}
+.gdsec h4{margin:0;padding:9px 13px;font-size:13px;background:var(--wash,#eef3ec);color:var(--stem-dk);display:flex;align-items:center;gap:7px}
+.gdsec .gdtext{padding:11px 13px;font-size:13.5px;line-height:1.75;color:var(--ink);white-space:pre-wrap}
+.gdsec .gdtext.empty{color:var(--soft)}
+.gddot{width:9px;height:9px;border-radius:50%;display:inline-block}
+.gdedit-grid label{font-size:12px;color:var(--stem-dk);font-weight:700;display:block;margin:12px 0 4px}
+.gdedit-grid textarea{width:100%;box-sizing:border-box;min-height:64px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font-size:13.5px;line-height:1.6;font-family:inherit;background:#fff;resize:vertical}
+#gdScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#gdScrim.show{opacity:1;pointer-events:auto}
+#gdSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#gdSheet.show{transform:translateY(0)}
 .plcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px;background:var(--card);box-shadow:var(--shadow)}
 .plcard .pltop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .plcard .plfield{font-weight:800;color:var(--stem-dk);font-size:14px}
@@ -393,7 +410,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       </button>
       <a class="tile" href="防除予定.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
-        <span>防除予定</span>
+        <span>防除・作業予定</span>
       </a>
       <a class="tile" href="防除履歴.html">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
@@ -420,10 +437,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/><rect x="6" y="5" width="5" height="4" rx="1"/><rect x="11" y="10" width="7" height="4" rx="1"/><rect x="8" y="15" width="6" height="4" rx="1"/></svg>
         <span>実作付け</span>
       </button>
-      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
-        <span class="badge">準備中</span>
+      <button class="tile" id="openGuide">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
-        <span>作付け提案</span>
+        <span>育てガイド</span>
       </button>
     </div>
 
@@ -535,6 +551,17 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="pScrim"></div>
 <div id="pSheet"><div class="grab"></div><div class="sheet-in" id="pSheetIn"></div></div>
+
+<div id="guideView">
+  <div class="calhead">
+    <h2>育てガイド</h2>
+    <button class="mclose" id="guideCloseBtn">閉じる</button>
+  </div>
+  <div class="gdcrops" id="guideCrops"></div>
+  <div class="gdbody" id="guideBody"></div>
+</div>
+<div id="gdScrim"></div>
+<div id="gdSheet"><div class="grab"></div><div class="sheet-in" id="gdSheetIn"></div></div>
 
 <div id="rScrim"></div>
 <div id="rSheet"><div class="grab"></div><div class="sheet-in" id="rSheetIn"></div></div>
@@ -1777,6 +1804,87 @@ document.getElementById('openPlant').onclick=openPlanting;
 document.getElementById('plantCloseBtn').onclick=()=>document.getElementById('plantView').classList.remove('show');
 document.getElementById('plantAddBtn').onclick=()=>openPlantEdit(null);
 document.getElementById('pScrim').onclick=closePlantEdit;
+
+/* ============== 育てガイド（作物ごと 播種/定植/収穫/ポイント） ============== */
+let GUIDES=[], guideCrop='';
+document.getElementById('openGuide').onclick=openGuide;
+document.getElementById('guideCloseBtn').onclick=()=>document.getElementById('guideView').classList.remove('show');
+document.getElementById('gdScrim').onclick=closeGuideEdit;
+async function openGuide(){
+  document.getElementById('guideView').classList.add('show');
+  if(!GUIDES.length) await loadGuides();
+  renderGuideCrops();
+  if(!guideCrop){ guideCrop=(GROWING&&GROWING.length)?GROWING[0]:(CROPS[0]?CROPS[0][0].replace('\n',''):''); }
+  renderGuideCrops(); renderGuideBody();
+}
+async function loadGuides(){
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listGuide')).json();
+    GUIDES=(j&&j.guides)?j.guides:[]; }catch(e){ GUIDES=[]; }
+}
+function guideOf(crop){ return GUIDES.find(g=>g.作物===crop)||null; }
+function renderGuideCrops(){
+  const box=document.getElementById('guideCrops'); if(!box) return;
+  // 栽培中→その他の順で並べる
+  const all=CROPS.map(c=>c[0].replace('\n',''));
+  const ordered=[]; (GROWING||[]).forEach(c=>{ if(all.indexOf(c)>=0&&ordered.indexOf(c)<0) ordered.push(c); });
+  all.forEach(c=>{ if(ordered.indexOf(c)<0) ordered.push(c); });
+  box.innerHTML=ordered.map(c=>'<button class="gdchip'+(c===guideCrop?' on':'')+'" onclick="selectGuide(\''+esc(c)+'\')">'+esc(c)+'</button>').join('');
+}
+function selectGuide(c){ guideCrop=c; renderGuideCrops(); renderGuideBody(); }
+function gdSection(icon,color,title,text){
+  const empty=!text;
+  return '<div class="gdsec"><h4><span class="gddot" style="background:'+color+'"></span>'+icon+' '+title+'</h4>'+
+    '<div class="gdtext'+(empty?' empty':'')+'">'+(empty?'未登録です。「編集」で追記するか、「AIに聞く」で下書きを作れます（AIは次の更新で追加予定）。':esc(text))+'</div></div>';
+}
+function renderGuideBody(){
+  const body=document.getElementById('guideBody'); if(!body) return;
+  if(!guideCrop){ body.innerHTML='<div class="note" style="padding:16px">作物を選んでください。</div>'; return; }
+  const g=guideOf(guideCrop)||{};
+  body.innerHTML=
+    gdSection('🌱','#a5d6a7','播種',g.播種||'')+
+    gdSection('🪴','#43a047','定植',g.定植||'')+
+    gdSection('🌾','#f9a825','収穫',g.収穫||'')+
+    gdSection('💡','#4a90d9','ポイント',g.ポイント||'')+
+    '<button class="save" id="gdEditBtn" style="margin-top:12px">この作物のガイドを編集</button>';
+  const b=document.getElementById('gdEditBtn'); if(b) b.onclick=openGuideEdit;
+}
+function openGuideEdit(){
+  const g=guideOf(guideCrop)||{作物:guideCrop,播種:'',定植:'',収穫:'',ポイント:''};
+  document.getElementById('gdSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">'+esc(guideCrop)+' の育てガイド</div></div>'+
+    '<div class="rec"><div class="gdedit-grid">'+
+      '<label>🌱 播種</label><textarea id="gd_sow">'+esc(g.播種||'')+'</textarea>'+
+      '<label>🪴 定植</label><textarea id="gd_plant">'+esc(g.定植||'')+'</textarea>'+
+      '<label>🌾 収穫</label><textarea id="gd_harvest">'+esc(g.収穫||'')+'</textarea>'+
+      '<label>💡 ポイント</label><textarea id="gd_point">'+esc(g.ポイント||'')+'</textarea>'+
+    '</div>'+
+    '<div class="note">糸島・あにきのやり方に合わせて自由に書き換えてください。空欄でも保存できます。</div>'+
+    '<button class="save" id="gd_save">保存</button></div>';
+  document.getElementById('gd_save').onclick=saveGuideNow;
+  document.getElementById('gdScrim').classList.add('show');
+  document.getElementById('gdSheet').classList.add('show');
+}
+function closeGuideEdit(){
+  document.getElementById('gdScrim').classList.remove('show');
+  document.getElementById('gdSheet').classList.remove('show');
+}
+async function saveGuideNow(){
+  const body={作物:guideCrop, 播種:pvId('gd_sow'), 定植:pvId('gd_plant'), 収穫:pvId('gd_harvest'), ポイント:pvId('gd_point')};
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const btn=document.getElementById('gd_save'); if(guardBtn(btn)===false) return;
+  try{
+    const u=CONFIG.GAS_URL+'?action=saveGuide&'+new URLSearchParams(body).toString();
+    const j=await (await fetch(u)).json();
+    if(j&&j.ok){
+      const i=GUIDES.findIndex(x=>x.作物===guideCrop);
+      if(i>=0) GUIDES[i]=body; else GUIDES.push(body);
+      renderGuideBody(); closeGuideEdit(); toast('育てガイドを保存しました');
+    }else toast('保存に失敗しました');
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
+function pvId(id){ const e=document.getElementById(id); return e?e.value:''; }
 let plantMode='list';
 document.getElementById('plantModeBtn').onclick=function(){
   plantMode=(plantMode==='list')?'gantt':'list';
