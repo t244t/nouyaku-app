@@ -30,7 +30,7 @@
   .dow div.sun{ color:#c0392b; } .dow div.sat{ color:#2266bb; }
   .grid{ display:grid; grid-template-columns:repeat(7,1fr); }
   .cell{ min-height:64px; border-top:1px solid var(--line); border-left:1px solid var(--line);
-    padding:3px; position:relative; }
+    padding:3px; position:relative; min-width:0; overflow:hidden; }
   .cell:nth-child(7n+1){ border-left:0; }
   .cell.out{ background:#fafbf8; }
   .cell.today{ background:#fffdf3; box-shadow:inset 0 0 0 2px #f0c14b; }
@@ -41,7 +41,7 @@
   .rain.r1{ color:#6a8aa3; }
   .rain.r2{ color:#1f6fd6; font-weight:700; }
   .rain.r3{ color:#fff; background:#1f6fd6; font-weight:700; }
-  .chip{ display:block; font-size:.64rem; line-height:1.25; margin-top:2px; padding:2px 4px;
+  .chip{ display:block; max-width:100%; box-sizing:border-box; font-size:.64rem; line-height:1.25; margin-top:2px; padding:2px 4px;
     border-radius:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:pointer; }
   .chip.plan{ border:1px solid var(--plan); color:var(--plan); background:var(--plan-bg); }
   .chip.plan.late{ border-color:var(--late); color:var(--late); background:var(--late-bg); }
