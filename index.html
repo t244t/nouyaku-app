@@ -231,6 +231,25 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #mapView.show{display:block}
 #calView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #calView.show{display:flex}
+#plantView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#plantView.show{display:flex}
+.plcard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin:8px;background:var(--card);box-shadow:var(--shadow)}
+.plcard .pltop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.plcard .plfield{font-weight:800;color:var(--stem-dk);font-size:14px}
+.plcard .plcrop{background:var(--stem);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
+.plcard .plspan{font-size:12.5px;color:var(--ink);margin-top:6px;line-height:1.6}
+.plcard .plsub{font-size:11.5px;color:var(--soft);margin-top:3px}
+.plcard .plbtns{display:flex;gap:7px;margin-top:9px}
+.plcard .pledit{appearance:none;border:1px solid #bcd5f0;background:#eef5fc;color:#1a5e9a;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer}
+.plcard .pldel{appearance:none;border:1px solid #e6b3b3;background:#fdeeee;color:#a23232;border-radius:8px;padding:5px 13px;font-size:12px;font-weight:700;cursor:pointer}
+.caledit2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.caledit2 label{font-size:11px;color:var(--soft);display:block;margin-bottom:3px;font-weight:700}
+.caledit2 select,.caledit2 input{width:100%;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font-size:14px;background:#fff;box-sizing:border-box}
+.caledit2 .full{grid-column:1 / -1}
+#pScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
+#pScrim.show{opacity:1;pointer-events:auto}
+#pSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:92vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
+#pSheet.show{transform:translateY(0)}
 .calhead{display:flex;align-items:center;gap:10px;padding:14px 14px 8px;border-bottom:1px solid var(--line)}
 .calhead h2{font-size:16px;margin:0;color:var(--stem-dk);flex:1}
 .calhead .mclose,.calhead .maddbtn{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 10px;font-size:12px;font-weight:700;color:var(--stem-dk);cursor:pointer}
@@ -396,6 +415,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h6M7 13h9M7 17h4"/></svg>
         <span>作付け暦</span>
       </button>
+      <button class="tile" id="openPlant">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h18M3 12h18M3 17h18"/><rect x="6" y="5" width="5" height="4" rx="1"/><rect x="11" y="10" width="7" height="4" rx="1"/><rect x="8" y="15" width="6" height="4" rx="1"/></svg>
+        <span>実作付け</span>
+      </button>
       <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
         <span class="badge">準備中</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2v.3h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2Z"/><path d="M9 21h6"/></svg>
@@ -498,6 +521,18 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="cScrim"></div>
 <div id="cSheet"><div class="grab"></div><div class="sheet-in" id="cSheetIn"></div></div>
+
+<div id="plantView">
+  <div class="calhead">
+    <h2>実作付け（圃場）</h2>
+    <button class="maddbtn" id="plantAddBtn">＋ 追加</button>
+    <button class="mclose" id="plantCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">圃場ごとの今年の作付け。カードをタップで編集できます。</span></div>
+  <div id="plantBody" class="calbody"></div>
+</div>
+<div id="pScrim"></div>
+<div id="pSheet"><div class="grab"></div><div class="sheet-in" id="pSheetIn"></div></div>
 
 <div id="rScrim"></div>
 <div id="rSheet"><div class="grab"></div><div class="sheet-in" id="rSheetIn"></div></div>
@@ -1733,6 +1768,124 @@ document.getElementById('calScopeBtn').onclick=()=>{
   renderGantt();
 };
 document.getElementById('cScrim').onclick=closeCalEdit;
+
+/* ============== 実作付け（圃場×作物×時期・実日付） ============== */
+let PLANTINGS=[];
+document.getElementById('openPlant').onclick=openPlanting;
+document.getElementById('plantCloseBtn').onclick=()=>document.getElementById('plantView').classList.remove('show');
+document.getElementById('plantAddBtn').onclick=()=>openPlantEdit(null);
+document.getElementById('pScrim').onclick=closePlantEdit;
+async function openPlanting(){
+  document.getElementById('plantView').classList.add('show');
+  if(!CALENDAR.length) await loadCalendar();
+  if(!fieldList.length) await loadFields();
+  await loadPlantings();
+}
+async function loadPlantings(){
+  if(!CONFIG.GAS_URL){ renderPlantingList(); return; }
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listPlanting')).json();
+    PLANTINGS=(j&&j.plantings)?j.plantings:[]; }catch(e){ PLANTINGS=[]; }
+  renderPlantingList();
+}
+function pdSpan(s,e){ if(!s&&!e) return ''; if(s&&e) return s+' 〜 '+e; return s||e; }
+function renderPlantingList(){
+  const body=document.getElementById('plantBody'); if(!body) return;
+  if(!PLANTINGS.length){
+    body.innerHTML='<div class="note" style="padding:18px">まだ実作付けがありません。右上の「＋ 追加」から、圃場と作物を選んで登録してください（標準暦から日付を自動で補完できます）。</div>';
+    return;
+  }
+  const list=PLANTINGS.slice().sort(function(a,b){
+    if(a['圃場']!==b['圃場']) return a['圃場']<b['圃場']?-1:1;
+    return String(a['播種日']||a['定植日'])<String(b['播種日']||b['定植日'])?-1:1;
+  });
+  body.innerHTML=list.map(function(r){
+    const id=esc(r['作付ID']||'');
+    const sow=r['播種日']?('播種 '+esc(r['播種日'])):'';
+    const pl=r['定植日']?('定植 '+esc(r['定植日'])):'';
+    const hv=(r['収穫開始']||r['収穫終了'])?('収穫 '+esc(pdSpan(r['収穫開始'],r['収穫終了']))):'';
+    const span=[sow,pl,hv].filter(function(x){return x;}).join('<br>');
+    const sub=[r['メモ'], r['記録者']?('記録者:'+r['記録者']):''].filter(function(x){return x;}).map(esc).join(' / ');
+    return '<div class="plcard">'+
+      '<div class="pltop"><span class="plfield">'+esc(r['圃場']||'(圃場未設定)')+'</span><span class="plcrop">'+esc(r['作物']||'')+'</span></div>'+
+      (span?'<div class="plspan">'+span+'</div>':'')+
+      (sub?'<div class="plsub">'+sub+'</div>':'')+
+      '<div class="plbtns"><button class="pledit" onclick="openPlantEdit(\''+id+'\')">編集</button>'+
+        '<button class="pldel" onclick="delPlanting(\''+id+'\')">削除</button></div>'+
+    '</div>';
+  }).join('');
+}
+function pv(id){ const e=document.getElementById(id); return e?e.value:''; }
+function openPlantEdit(id){
+  const r = id ? (PLANTINGS.find(x=>String(x['作付ID'])===id)||{}) : {};
+  const fopts=(fieldList.length?fieldList.map(f=>f.name):FIELDS).map(n=>'<option'+(r['圃場']===n?' selected':'')+'>'+esc(n)+'</option>').join('');
+  const copts=CROPS.map(([name])=>{ const n=name.replace('\n',''); return '<option'+(r['作物']===n?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+  const yNow=new Date().getFullYear();
+  let yopts=''; for(let y=yNow-1;y<=yNow+1;y++) yopts+='<option'+(y===yNow?' selected':'')+'>'+y+'</option>';
+  document.getElementById('pSheetIn').innerHTML=
+    '<div class="fh"><div class="nm">'+(id?'実作付けの編集':'実作付けの追加')+'</div></div>'+
+    '<div class="rec"><div class="caledit2">'+
+      '<div><label>圃場</label><select id="pe_field">'+fopts+'</select></div>'+
+      '<div><label>作物</label><select id="pe_crop">'+copts+'</select></div>'+
+      '<div><label>基準の年（補完用）</label><select id="pe_year">'+yopts+'</select></div>'+
+      '<div style="display:flex;align-items:flex-end"><button class="mapbtn" id="pe_fill" style="width:100%">標準暦から補完</button></div>'+
+      '<div><label>播種日</label><input id="pe_sow" type="date" value="'+esc(r['播種日']||'')+'"></div>'+
+      '<div><label>定植日</label><input id="pe_plant" type="date" value="'+esc(r['定植日']||'')+'"></div>'+
+      '<div><label>収穫開始</label><input id="pe_hs" type="date" value="'+esc(r['収穫開始']||'')+'"></div>'+
+      '<div><label>収穫終了</label><input id="pe_he" type="date" value="'+esc(r['収穫終了']||'')+'"></div>'+
+      '<div class="full"><label>メモ</label><input id="pe_memo" value="'+esc(r['メモ']||'')+'" placeholder="品種・株数・ずらし作付けの回など"></div>'+
+    '</div>'+
+    '<div class="note">「標準暦から補完」を押すと、選んだ作物の標準的な月から各日付の目安（その月の1日）を自動で入れます。あとは実際の日付に微調整してください。使わない工程は空のままでOKです。</div>'+
+    '<button class="save" id="pe_save">保存</button></div>';
+  document.getElementById('pe_fill').onclick=plantAutofill;
+  document.getElementById('pe_save').onclick=()=>savePlantingNow(id);
+  document.getElementById('pScrim').classList.add('show');
+  document.getElementById('pSheet').classList.add('show');
+}
+function closePlantEdit(){
+  document.getElementById('pScrim').classList.remove('show');
+  document.getElementById('pSheet').classList.remove('show');
+}
+function plantAutofill(){
+  const crop=pv('pe_crop'); const year=Number(pv('pe_year'))||new Date().getFullYear();
+  const c=CALENDAR.find(x=>x.作物===crop);
+  if(!c){ toast('標準暦にこの作物がありません。作付け暦で先に設定できます'); return; }
+  const sow=c.育苗開始||c.定植開始, plant=c.定植開始, hs=c.収穫開始, he=c.収穫終了;
+  const ds=(y,m)=> m?(y+'-'+String(m).padStart(2,'0')+'-01'):'';
+  let hy=year; if(hs&&plant&&hs<plant) hy=year+1;           // 収穫が定植より前の月＝翌年
+  let hey=hy; if(hs&&he&&he<hs) hey=hy+1;                   // 収穫終了が開始より前＝さらに翌年
+  const set=(id,v)=>{ const e=document.getElementById(id); if(e) e.value=v; };
+  set('pe_sow', ds(year, sow));
+  set('pe_plant', ds(year, plant));
+  set('pe_hs', ds(hy, hs));
+  set('pe_he', ds(hey, he));
+  toast('標準暦から目安の日付を入れました。実際に合わせて調整してください');
+}
+async function savePlantingNow(id){
+  const body={ 圃場:pv('pe_field'), 作物:pv('pe_crop'),
+    播種日:pv('pe_sow'), 定植日:pv('pe_plant'), 収穫開始:pv('pe_hs'), 収穫終了:pv('pe_he'),
+    メモ:pv('pe_memo'), 記録者:RECORDER };
+  if(id) body.id=id;
+  if(!body.圃場||!body.作物){ toast('圃場と作物を選んでください'); return; }
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const btn=document.getElementById('pe_save'); if(guardBtn(btn)===false) return;
+  try{
+    const u=CONFIG.GAS_URL+'?action=savePlanting&'+new URLSearchParams(body).toString();
+    const j=await (await fetch(u)).json();
+    if(j&&j.ok){ await loadPlantings(); closePlantEdit(); toast('実作付けを保存しました'); }
+    else toast('保存に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
+async function delPlanting(id){
+  if(!id) return;
+  if(!confirm('この実作付けを削除します。よろしいですか？\n（この操作は取り消せません）')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=deletePlanting&'+new URLSearchParams({id:id}))).json();
+    if(j&&j.ok){ toast('削除しました'); await loadPlantings(); }
+    else toast('削除に失敗しました');
+  }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
+}
 
 /* ============== 記録者（この端末の名前。記録・予定に付与） ============== */
 let RECORDER='';
