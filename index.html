@@ -271,6 +271,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .gbar.nae{background:#a5d6a7}
 .gbar.tei{background:#43a047}
 .gbar.shu{background:#f9a825}
+.gpllabel{position:absolute;font-size:9.5px;font-weight:700;color:#1b3a1b;white-space:nowrap;pointer-events:none;text-shadow:0 1px 2px rgba(255,255,255,.7);transform:translateY(-11px)}
 #cScrim{position:fixed;inset:0;background:rgba(24,35,26,.4);opacity:0;pointer-events:none;transition:opacity .2s;z-index:1500}
 #cScrim.show{opacity:1;pointer-events:auto}
 #cSheet{position:fixed;left:0;right:0;bottom:0;z-index:1600;background:var(--paper);border-radius:20px 20px 0 0;max-width:480px;margin:0 auto;transform:translateY(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1);max-height:90vh;overflow:auto;box-shadow:0 -8px 40px rgba(24,35,26,.28);padding-bottom:calc(env(safe-area-inset-bottom) + 8px)}
@@ -525,6 +526,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 <div id="plantView">
   <div class="calhead">
     <h2>実作付け（圃場）</h2>
+    <button class="maddbtn" id="plantModeBtn">ガント表示</button>
     <button class="maddbtn" id="plantAddBtn">＋ 追加</button>
     <button class="mclose" id="plantCloseBtn">閉じる</button>
   </div>
@@ -1775,6 +1777,84 @@ document.getElementById('openPlant').onclick=openPlanting;
 document.getElementById('plantCloseBtn').onclick=()=>document.getElementById('plantView').classList.remove('show');
 document.getElementById('plantAddBtn').onclick=()=>openPlantEdit(null);
 document.getElementById('pScrim').onclick=closePlantEdit;
+let plantMode='list';
+document.getElementById('plantModeBtn').onclick=function(){
+  plantMode=(plantMode==='list')?'gantt':'list';
+  this.textContent=(plantMode==='list')?'ガント表示':'一覧表示';
+  renderPlanting();
+};
+function renderPlanting(){ if(plantMode==='gantt') renderPlantingGantt(); else renderPlantingList(); }
+function pdParse(s){ const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); return m?{y:+m[1],mo:+m[2],d:+m[3]}:null; }
+function daysIn(y,mo){ return new Date(y,mo,0).getDate(); }
+function plIdx(s, sy, sm){ const p=pdParse(s); if(!p) return null; return (p.y-sy)*12+(p.mo-sm)+(p.d-1)/daysIn(p.y,p.mo); }
+function plSpan(r){ // 全体の開始・終了idx（レーン判定用）
+  const ds=[r['播種日'],r['定植日'],r['収穫開始'],r['収穫終了']].filter(function(x){return x;});
+  return ds.length?{first:ds[0], last:ds[ds.length-1]}:null;
+}
+function renderPlantingGantt(){
+  const body=document.getElementById('plantBody'); if(!body) return;
+  if(!PLANTINGS.length){ renderPlantingList(); return; }
+  const now=new Date(); const sy=now.getFullYear(), sm=now.getMonth()+1;
+  const TOTAL=14;
+  const clamp=v=>Math.max(0,Math.min(TOTAL,v));
+  // 月ヘッダー
+  let months='';
+  for(let i=0;i<TOTAL;i++){
+    const mm=((sm-1+i)%12)+1; const yy=sy+Math.floor((sm-1+i)/12);
+    const lbl=(mm===1)?(yy+'/1'):(mm+'');
+    months+='<span class="gm'+(i===0?' now':'')+'" style="left:'+(i/TOTAL*100)+'%">'+lbl+'</span>';
+  }
+  const head='<div class="grow ghdr"><div class="glabel">圃場</div><div class="gtrack" style="min-width:'+(TOTAL*40)+'px">'+months+'</div></div>';
+  // 圃場ごとにグループ化（圃場マスタ順→その他）
+  const order=(fieldList.length?fieldList.map(f=>f.name):FIELDS).slice();
+  const byField={};
+  PLANTINGS.forEach(function(pl){ const f=pl['圃場']||'(未設定)'; (byField[f]=byField[f]||[]).push(pl); });
+  Object.keys(byField).forEach(function(f){ if(order.indexOf(f)<0) order.push(f); });
+
+  const seg=(s,e,cls,laneTop)=>{
+    const a=plIdx(s,sy,sm), b=plIdx(e,sy,sm);
+    if(a==null||b==null) return '';
+    let L=clamp(a), R=clamp(b); if(R<=0||L>=TOTAL||R<=L) return '';
+    return '<div class="gbar '+cls+'" style="left:'+(L/TOTAL*100)+'%;width:'+((R-L)/TOTAL*100)+'%;top:'+laneTop+'px"></div>';
+  };
+  let rows='';
+  order.forEach(function(f){
+    const arr=(byField[f]||[]).filter(function(r){ return plSpan(r); });
+    if(!arr.length) return;
+    // レーン割り当て（期間が重なるものは別レーン）
+    arr.sort(function(a,b){ return String(plSpan(a).first)<String(plSpan(b).first)?-1:1; });
+    const laneEnd=[]; // 各レーンの最後のidx終端
+    arr.forEach(function(r){
+      const sp=plSpan(r); const st=plIdx(sp.first,sy,sm)||0; const en=plIdx(sp.last,sy,sm)||0;
+      let lane=0; for(;lane<laneEnd.length;lane++){ if(st>=laneEnd[lane]) break; }
+      laneEnd[lane]=en; r.__lane=lane;
+    });
+    const laneN=Math.max(1,laneEnd.length);
+    const h=laneN*18+8;
+    const nowcol='<div class="gnowcol" style="left:0;width:'+(100/TOTAL)+'%"></div>';
+    let bars='';
+    arr.forEach(function(r){
+      const top=4+r.__lane*18;
+      // 育苗(播種→定植) 定植(定植→収穫開始) 収穫(収穫開始→終了)
+      bars+=seg(r['播種日'],r['定植日'],'nae',top);
+      bars+=seg(r['定植日'],r['収穫開始'],'tei',top);
+      bars+=seg(r['収穫開始'],r['収穫終了'],'shu',top);
+      // 作物名ラベル（バーの先頭付近）
+      const sp=plSpan(r); const a=plIdx(sp.first,sy,sm);
+      if(a!=null && a<TOTAL){ const L=Math.max(0,a);
+        bars+='<div class="gpllabel" style="left:'+(L/TOTAL*100)+'%;top:'+(top-1)+'px">'+esc(r['作物']||'')+'</div>'; }
+    });
+    rows+='<div class="grow" style="cursor:default"><div class="glabel">'+esc(f)+'</div>'+
+      '<div class="gtrack" style="min-width:'+(TOTAL*40)+'px;min-height:'+h+'px">'+nowcol+bars+'</div></div>';
+  });
+  if(!rows) rows='<div class="note" style="padding:18px">日付が入った実作付けがありません。各作付けに播種日や収穫日を入れると、ここに帯で表示されます。</div>';
+  body.innerHTML='<div class="callegend" style="border:none;padding:8px 6px">'+
+      '<span><span class="lgbar" style="background:#a5d6a7"></span>育苗</span>'+
+      '<span><span class="lgbar" style="background:#43a047"></span>定植〜</span>'+
+      '<span><span class="lgbar" style="background:#f9a825"></span>収穫</span>'+
+      '<span style="color:#c0392b">赤帯＝今月</span></div>'+
+    '<div class="ganttgrid" style="min-width:'+(84+TOTAL*40)+'px">'+head+rows+'</div>';
+}
 async function openPlanting(){
   document.getElementById('plantView').classList.add('show');
   if(!CALENDAR.length) await loadCalendar();
@@ -1782,10 +1862,10 @@ async function openPlanting(){
   await loadPlantings();
 }
 async function loadPlantings(){
-  if(!CONFIG.GAS_URL){ renderPlantingList(); return; }
+  if(!CONFIG.GAS_URL){ renderPlanting(); return; }
   try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listPlanting')).json();
     PLANTINGS=(j&&j.plantings)?j.plantings:[]; }catch(e){ PLANTINGS=[]; }
-  renderPlantingList();
+  renderPlanting();
 }
 function pdSpan(s,e){ if(!s&&!e) return ''; if(s&&e) return s+' 〜 '+e; return s||e; }
 function renderPlantingList(){
