@@ -91,6 +91,20 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .alert.disease{background:#f0f6ee;border-color:#cfe3c4;color:#3a6b2e}
 .alert.calm{background:#f4f6f4;border-color:var(--line);color:var(--sub)}
 #weekWx{margin:8px 0 2px}
+#hourWx{margin:8px 0 2px}
+.hwwrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 4px 10px 12px;box-shadow:var(--shadow)}
+.hwttl{font-size:12.5px;font-weight:800;color:var(--stem-dk);margin-bottom:8px}
+.hwrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.hwcell{flex:0 0 auto;width:48px;text-align:center;border-radius:10px;padding:7px 3px;background:var(--paper);border:1px solid var(--line)}
+.hwcell.rain{background:#e8f0fa;border-color:#bcd5f0}
+.hwcell.rain2{background:#d6e6f7;border-color:#9ec3e8}
+.hwcell.now{outline:2px solid var(--shoudoku)}
+.hwh{font-size:11px;color:var(--soft);font-weight:700}
+.hwi{font-size:15px;line-height:1.5}
+.hwp{font-size:12px;font-weight:800;color:#1a5e9a}
+.hwp.dry{color:var(--soft);font-weight:700}
+.hwmm{font-size:9.5px;color:#1a5e9a}
+.hwt{font-size:10px;color:var(--sub);margin-top:1px}
 #todaySummary{margin:6px 0 2px}
 #recBar{margin:6px 0 2px}
 .recbar{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--sub);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 11px}
@@ -415,6 +429,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div id="alertBar"></div>
 
   <div id="weekWx"></div>
+
+  <div id="hourWx"></div>
 
   <div class="menu">
     <div class="eyebrow">防除・診断</div>
@@ -1795,6 +1811,7 @@ async function loadAlerts(){
     const fc=await res.json();
     if(!fc||!fc.daily) return;
     renderWeek(fc.daily);
+    renderHours(fc.hourly);
     SUM.daily=fc.daily; SUM.alerts=computeAlerts(fc.daily); renderSummary();
     if(!bar) return;
     const al=SUM.alerts;
@@ -1896,6 +1913,31 @@ function wxIcon(precip, prob, snow){
   return '☀️';
 }
 function jpDow(iso){ const d=new Date(iso+'T00:00:00'); return '日月火水木金土'[d.getDay()]; }
+function renderHours(hr){
+  const box=document.getElementById('hourWx'); if(!box) return;
+  if(!hr||!hr.time||!hr.time.length){ box.innerHTML=''; return; }
+  const n=hr.time.length;
+  let cells='';
+  for(let i=0;i<n;i++){
+    const t=hr.time[i]; const hh=Number(t.slice(11,13));
+    const prob=(hr.prob&&hr.prob[i]!=null)?hr.prob[i]:0;
+    const mm=(hr.precip&&hr.precip[i]!=null)?hr.precip[i]:0;
+    const tp=(hr.temp&&hr.temp[i]!=null)?Math.round(hr.temp[i]):null;
+    const icon = (mm>=1||prob>=70)?'🌧️' : (mm>=0.2||prob>=50)?'🌦️' : (prob>=30)?'⛅' : '☀️';
+    const cls = (mm>=1||prob>=70)?'rain2' : (mm>=0.2||prob>=40)?'rain' : '';
+    const isNow = (i===0);
+    const dayMark = (hh===0||i===0)?('<div class="hwt">'+md(t.slice(0,10))+'</div>'):'';
+    cells+='<div class="hwcell '+cls+(isNow?' now':'')+'">'+
+      '<div class="hwh">'+(isNow?'今':hh+'時')+'</div>'+
+      '<div class="hwi">'+icon+'</div>'+
+      '<div class="hwp'+(prob<30?' dry':'')+'">'+prob+'%</div>'+
+      (mm>=0.1?'<div class="hwmm">'+(Math.round(mm*10)/10)+'mm</div>':'')+
+      (tp!=null?'<div class="hwt">'+tp+'°</div>':'')+
+      dayMark+
+    '</div>';
+  }
+  box.innerHTML='<div class="hwwrap"><div class="hwttl">今日これからの雨（1時間ごと・24時間）</div><div class="hwrow">'+cells+'</div></div>';
+}
 function renderWeek(dl){
   const box=document.getElementById('weekWx'); if(!box||!dl||!dl.time) return;
   const n=Math.min(7, dl.time.length);
