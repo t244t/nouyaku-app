@@ -273,6 +273,23 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #stockView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #stockView.show{display:flex}
 #stockBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+#diluteView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#diluteView.show{display:flex}
+.dilbody{padding:14px 14px 40px;overflow:auto}
+.dilcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:13px 14px;box-shadow:var(--shadow);margin-bottom:12px}
+.dillab{font-size:13px;font-weight:800;color:var(--stem-dk);margin-bottom:9px}
+.dilchips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.dilchips .dchip{border:1px solid var(--line);background:#fff;color:var(--stem-dk);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer}
+.dilchips .dchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
+.dilinput{display:flex;align-items:center;gap:8px}
+.dilinput input{flex:1;min-width:0;font-size:18px;font-weight:700;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.dilinput .dilunit{font-size:15px;font-weight:800;color:var(--sub)}
+.dilresult{background:linear-gradient(180deg,#f3f8f3,#eaf3ea);border:1px solid #cfe3d2;border-radius:16px;padding:18px 16px;text-align:center;margin-top:4px}
+.dilresult .rmain{font-size:15px;color:var(--sub);font-weight:700}
+.dilresult .rbig{font-size:30px;font-weight:900;color:var(--stem-dk);margin:6px 0 2px;line-height:1.2}
+.dilresult .rsub{font-size:14px;color:var(--sub);font-weight:700;margin-top:8px}
+.dilresult .rwait{color:#aeb8aa;font-weight:700;font-size:14px}
+.dilnote{font-size:11.5px;color:var(--soft);line-height:1.6;margin-top:14px}
 #toolBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 .tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:stretch}
 .tcard .timgwrap{width:116px;height:92px;flex:0 0 116px;background:#eef1ea;overflow:hidden;display:flex;align-items:center;justify-content:center}
@@ -480,6 +497,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-4h12l3 4"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 12h6"/></svg>
         <span>農薬在庫</span>
       </button>
+      <button class="tile" id="openDilute">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3h6M10 3v5l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 14h10"/></svg>
+        <span>希釈計算</span>
+      </button>
     </div>
 
     <div class="eyebrow">圃場・作付け</div>
@@ -642,6 +663,27 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="gdScrim"></div>
 <div id="gdSheet"><div class="grab"></div><div class="sheet-in" id="gdSheetIn"></div></div>
+
+<div id="diluteView">
+  <div class="calhead">
+    <h2>希釈計算</h2>
+    <button class="mclose" id="diluteCloseBtn">閉じる</button>
+  </div>
+  <div class="dilbody">
+    <div class="dilcard">
+      <div class="dillab">希釈倍率</div>
+      <div class="dilchips" id="dilRateChips"></div>
+      <div class="dilinput"><input id="dilRate" type="number" inputmode="numeric" placeholder="例：1000"><span class="dilunit">倍</span></div>
+    </div>
+    <div class="dilcard">
+      <div class="dillab">作りたい薬液の量</div>
+      <div class="dilchips" id="dilVolChips"></div>
+      <div class="dilinput"><input id="dilVol" type="number" inputmode="decimal" placeholder="例：20"><span class="dilunit">L</span></div>
+    </div>
+    <div class="dilresult" id="dilResult"></div>
+    <div class="dilnote">「農薬の量」は、薬液の量 ÷ 倍率で計算しています。液剤はmL、粒剤・水和剤などはgとして読み替えてください（重さと体積は1mL≒1gで概算）。正確な使用量・希釈は、必ず農薬のラベルに従ってください。</div>
+  </div>
+</div>
 
 <div id="stockView">
   <div class="calhead">
@@ -1865,6 +1907,46 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+/* ============== 希釈計算 ============== */
+const DIL_RATES=[250,500,1000,1500,2000,3000];
+const DIL_VOLS=[5,10,20,50,100,500];
+function openDilute(){
+  document.getElementById('diluteView').classList.add('show');
+  renderDilChips(); calcDilute();
+}
+function renderDilChips(){
+  const rc=document.getElementById('dilRateChips');
+  const vc=document.getElementById('dilVolChips');
+  if(rc) rc.innerHTML=DIL_RATES.map(r=>'<button class="dchip" data-r="'+r+'">'+comma(r)+'倍</button>').join('');
+  if(vc) vc.innerHTML=DIL_VOLS.map(v=>'<button class="dchip" data-v="'+v+'">'+v+'L</button>').join('');
+  if(rc) rc.querySelectorAll('.dchip').forEach(b=>b.onclick=()=>{ document.getElementById('dilRate').value=b.dataset.r; markDilChips(); calcDilute(); });
+  if(vc) vc.querySelectorAll('.dchip').forEach(b=>b.onclick=()=>{ document.getElementById('dilVol').value=b.dataset.v; markDilChips(); calcDilute(); });
+}
+function markDilChips(){
+  const rate=document.getElementById('dilRate').value, vol=document.getElementById('dilVol').value;
+  document.querySelectorAll('#dilRateChips .dchip').forEach(b=>b.classList.toggle('on', b.dataset.r===String(rate)));
+  document.querySelectorAll('#dilVolChips .dchip').forEach(b=>b.classList.toggle('on', b.dataset.v===String(vol)));
+}
+function fmtAmt(ml){ // mL/g表示。1000mL以上はL併記
+  const r=Math.round(ml*10)/10;
+  let s=(r%1===0?String(r):r.toFixed(1))+' mL';
+  if(ml>=1000){ const l=Math.round(ml/100)/10; s+='（約'+l+' L）'; }
+  return s;
+}
+function calcDilute(){
+  const box=document.getElementById('dilResult'); if(!box) return;
+  const rate=parseFloat(document.getElementById('dilRate').value);
+  const vol=parseFloat(document.getElementById('dilVol').value);
+  if(!rate||!vol||rate<=0||vol<=0){ box.innerHTML='<div class="rwait">希釈倍率と薬液の量を入れると、必要な農薬量が表示されます。</div>'; return; }
+  const totalMl=vol*1000;
+  const chemMl=totalMl/rate;
+  const waterMl=totalMl-chemMl;
+  const waterL=Math.round(waterMl/100)/10;
+  box.innerHTML='<div class="rmain">'+comma(rate)+'倍 で '+vol+'L つくる場合</div>'+
+    '<div class="rbig">農薬 '+fmtAmt(chemMl)+'</div>'+
+    '<div class="rsub">＋ 水 約'+waterL+' L（合計 '+vol+'L）</div>'+
+    '<div class="rsub" style="margin-top:6px;color:#9a7a00">液剤は mL、粒剤・水和剤は g として読み替え</div>';
+}
 /* ============== 農薬在庫 ============== */
 const STOCK_CATS=['除草剤','殺菌剤','殺虫剤'];
 const STOCK_UNITS=['本','袋','缶','箱','kg','g','L','mL'];
@@ -2132,6 +2214,10 @@ document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(r
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('openTools').onclick=openTools;
 document.getElementById('openStock').onclick=openStock;
+document.getElementById('openDilute').onclick=openDilute;
+document.getElementById('diluteCloseBtn').onclick=()=>document.getElementById('diluteView').classList.remove('show');
+document.getElementById('dilRate').oninput=()=>{ markDilChips(); calcDilute(); };
+document.getElementById('dilVol').oninput=()=>{ markDilChips(); calcDilute(); };
 document.getElementById('stockCloseBtn').onclick=()=>document.getElementById('stockView').classList.remove('show');
 document.getElementById('stockAddBtn').onclick=()=>openStockForm(null);
 document.getElementById('toolCloseBtn').onclick=()=>document.getElementById('toolView').classList.remove('show');
