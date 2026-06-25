@@ -246,6 +246,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #mapView.show{display:block}
 #polyBar{position:absolute;left:0;right:0;bottom:0;z-index:1200;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);display:none;box-shadow:0 -6px 24px rgba(24,35,26,.18)}
 #polyBar.show{display:block}
+.maddbtn.on{background:#1a5e9a;color:#fff;border-color:#1a5e9a}
 #polyBar .pbtitle{font-size:13.5px;font-weight:800;color:var(--stem-dk)}
 #polyBar .pbcount{margin-left:8px;font-size:12px;color:var(--soft);font-weight:700}
 #polyBar .pbmsg{font-size:12px;color:var(--sub);margin:4px 0 8px}
@@ -493,8 +494,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 
     <div class="eyebrow">天気</div>
     <div class="tiles">
-      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
-        <span class="badge">準備中</span>
+      <button class="tile" id="openRadar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3.5 3.5 0 0 1 0 7"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
         <span>雨雲レーダー</span>
       </button>
@@ -533,7 +533,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div class="mtop">
     <div class="row">
       <h2>圃場マップ</h2>
-      <button class="maddbtn" id="addField" style="margin-left:auto">＋ 圃場を追加</button>
+      <button class="maddbtn" id="radarBtn" style="margin-left:auto">☁️ 雨雲</button>
+      <button class="maddbtn" id="addField">＋ 圃場を追加</button>
       <button class="mclose" id="closeMap" title="閉じる">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1F4F2A" stroke-width="2.4"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
@@ -542,6 +543,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       <span class="lg"><span class="dot done"></span><span class="done-t">除草済み</span></span>
       <span class="lg"><span class="dot partial"></span><span class="partial-t">一部済み</span></span>
       <span class="lg"><span class="dot todo"></span><span class="todo-t">未処理</span></span>
+      <span class="lg" id="radarTime" style="color:#1a5e9a;font-weight:700"></span>
     </div>
   </div>
   <div id="polyBar">
@@ -1375,6 +1377,36 @@ function buildLayers(){
 
 async function reloadMap(){ await loadFieldStatus(); await loadFields(); if(typeof loadPlantings==='function'){ try{ await loadPlantings(); }catch(e){} } buildLayers(); }
 
+/* ============== 雨雲レーダー（RainViewer） ============== */
+let radarOn=false, radarLayer=null, radarHost=null, radarFrames=null;
+function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
+async function toggleRadar(force){
+  radarOn=(force!=null)?force:!radarOn;
+  const btn=document.getElementById('radarBtn');
+  if(radarOn){
+    if(btn) btn.classList.add('on');
+    try{
+      if(!radarFrames){
+        const j=await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json();
+        radarHost=j.host; radarFrames=(j.radar&&j.radar.past)?j.radar.past:[];
+      }
+      if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); radarOn=false; if(btn) btn.classList.remove('on'); return; }
+      const f=radarFrames[radarFrames.length-1];
+      if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
+      radarLayer=L.tileLayer(radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png',
+        {opacity:0.65, maxNativeZoom:8, maxZoom:19, zIndex:650,
+         attribution:'雨雲 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}).addTo(mapObj);
+      const dt=new Date(f.time*1000);
+      const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
+      setRadarTime('☁️ 雨雲 '+hh+':'+mm+' 時点');
+    }catch(e){ toast('雨雲データを取得できませんでした'); radarOn=false; if(btn) btn.classList.remove('on'); }
+  }else{
+    if(btn) btn.classList.remove('on');
+    if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
+    setRadarTime('');
+  }
+}
+
 async function initMap(){
   if(mapReady) return; mapReady=true;
   mapObj=L.map('map',{zoomControl:false}).setView([33.5563,130.1972],14);
@@ -1725,10 +1757,12 @@ async function uploadWorkPhotos(workId){
 
 document.getElementById('fScrim').onclick=closeFieldSheet;
 document.getElementById('openMap').onclick=async()=>{ document.getElementById('mapView').classList.add('show'); await initMap(); setTimeout(()=>mapObj&&mapObj.invalidateSize(),80); };
+document.getElementById('openRadar').onclick=async()=>{ document.getElementById('mapView').classList.add('show'); await initMap(); setTimeout(()=>{ if(mapObj) mapObj.invalidateSize(); toggleRadar(true); },120); };
 document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.getElementById('mapView').classList.remove('show'); };
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+document.getElementById('radarBtn').onclick=()=>toggleRadar();
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('whCloseBtn').onclick=()=>document.getElementById('workHistView').classList.remove('show');
 document.getElementById('whAddBtn').onclick=openWorkForm;
