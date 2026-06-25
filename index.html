@@ -597,7 +597,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <button id="radarPrev" title="前のコマ">◀</button>
     <button id="radarPlay" title="再生／停止">▶</button>
     <button id="radarNext" title="次のコマ">▶</button>
-    <span class="rcnote">雨雲の動き（過去2時間）</span>
+    <span class="rcnote">雨雲の動き（過去2時間〜この先30分予想）</span>
   </div>
   <div id="polyBar">
     <div class="pbtitle">区画を編集中：<b id="polyName"></b><span id="polyCount" class="pbcount"></span></div>
@@ -1475,7 +1475,7 @@ async function reloadMap(){ await loadFieldStatus(); await loadFields(); if(type
 
 /* ============== 雨雲レーダー（RainViewer） ============== */
 let radarOn=false, radarHost=null, radarFrames=null, baseLayer=null,
-    radarPos=0, radarTimer=null, radarPlaying=false, radarLayerCache={};
+    radarPos=0, radarTimer=null, radarPlaying=false, radarLayerCache={}, radarNowIdx=0;
 const ESRI_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const OSM_URL='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
@@ -1494,12 +1494,17 @@ async function toggleRadar(force){
     try{
       if(!radarFrames){
         const j=await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json();
-        radarHost=j.host; radarFrames=(j.radar&&j.radar.past)?j.radar.past:[];
+        radarHost=j.host;
+        const past=(j.radar&&j.radar.past)?j.radar.past:[];
+        const now=(j.radar&&j.radar.nowcast)?j.radar.nowcast:[];
+        radarFrames=past.map(f=>({time:f.time,path:f.path,fc:false}))
+                   .concat(now.map(f=>({time:f.time,path:f.path,fc:true})));
+        radarNowIdx=Math.max(0,past.length-1); // 「今」（最新の実測）の位置
       }
       if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); }
       else{
         radarLayerCache={};
-        showRadarFrame(radarFrames.length-1); // 最新コマ
+        showRadarFrame(radarNowIdx); // 「今」のコマから
         const cb=document.getElementById('radarCtrl'); if(cb) cb.classList.add('show');
         updateRadarBtns();
       }
@@ -1534,8 +1539,10 @@ function showRadarFrame(i){
   lyr.setOpacity(0.85);
   const dt=new Date(f.time*1000);
   const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
-  const isLast=(radarPos===radarFrames.length-1);
-  setRadarTime('☁️ 雨雲 '+hh+':'+mm+(isLast?' 時点（最新）':''));
+  let tag='';
+  if(f.fc) tag=' 予想';
+  else if(radarPos===radarNowIdx) tag=' 時点（今）';
+  setRadarTime('☁️ 雨雲 '+hh+':'+mm+tag);
 }
 function radarPlay(){
   if(!radarFrames||radarFrames.length<2) return;
