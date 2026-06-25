@@ -1475,7 +1475,7 @@ async function reloadMap(){ await loadFieldStatus(); await loadFields(); if(type
 
 /* ============== 雨雲レーダー（RainViewer） ============== */
 let radarOn=false, radarHost=null, radarFrames=null, baseLayer=null,
-    radarPos=0, radarTimer=null, radarPlaying=false, radarLayerCache={}, radarNowIdx=0;
+    radarPos=0, radarTimer=null, radarPlaying=false, radarLayerCache={}, radarNowIdx=0, radarFcCount=0;
 const ESRI_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const OSM_URL='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
@@ -1500,6 +1500,7 @@ async function toggleRadar(force){
         radarFrames=past.map(f=>({time:f.time,path:f.path,fc:false}))
                    .concat(now.map(f=>({time:f.time,path:f.path,fc:true})));
         radarNowIdx=Math.max(0,past.length-1); // 「今」（最新の実測）の位置
+        radarFcCount=now.length;
       }
       if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); }
       else{
@@ -1541,7 +1542,7 @@ function showRadarFrame(i){
   const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
   let tag='';
   if(f.fc) tag=' 予想';
-  else if(radarPos===radarNowIdx) tag=' 時点（今）';
+  else if(radarPos===radarNowIdx) tag=(radarFcCount>0?' 時点（今・▶で予想へ）':' 時点（今・予想データなし）');
   setRadarTime('☁️ 雨雲 '+hh+':'+mm+tag);
 }
 function radarPlay(){
