@@ -1378,40 +1378,56 @@ function buildLayers(){
 async function reloadMap(){ await loadFieldStatus(); await loadFields(); if(typeof loadPlantings==='function'){ try{ await loadPlantings(); }catch(e){} } buildLayers(); }
 
 /* ============== 雨雲レーダー（RainViewer） ============== */
-let radarOn=false, radarLayer=null, radarHost=null, radarFrames=null;
+let radarOn=false, radarLayer=null, radarHost=null, radarFrames=null, satTiles=null, streetTiles=null;
 function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
 async function toggleRadar(force){
   radarOn=(force!=null)?force:!radarOn;
   const btn=document.getElementById('radarBtn');
   if(radarOn){
     if(btn) btn.classList.add('on');
+    // 背景を通常地図に（衛星写真は広域ズームに非対応のため）
+    if(satTiles && mapObj.hasLayer(satTiles)) mapObj.removeLayer(satTiles);
+    if(!streetTiles) streetTiles=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'地図 © OpenStreetMap'});
+    if(!mapObj.hasLayer(streetTiles)){ streetTiles.addTo(mapObj); streetTiles.bringToBack(); }
     try{
       if(!radarFrames){
         const j=await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json();
         radarHost=j.host; radarFrames=(j.radar&&j.radar.past)?j.radar.past:[];
       }
-      if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); radarOn=false; if(btn) btn.classList.remove('on'); return; }
-      const f=radarFrames[radarFrames.length-1];
-      if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
-      radarLayer=L.tileLayer(radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png',
-        {opacity:0.65, maxNativeZoom:8, maxZoom:19, zIndex:650,
-         attribution:'雨雲 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}).addTo(mapObj);
-      const dt=new Date(f.time*1000);
-      const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
-      setRadarTime('☁️ 雨雲 '+hh+':'+mm+' 時点');
-    }catch(e){ toast('雨雲データを取得できませんでした'); radarOn=false; if(btn) btn.classList.remove('on'); }
+      if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); }
+      else{
+        const f=radarFrames[radarFrames.length-1];
+        if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
+        radarLayer=L.tileLayer(radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png',
+          {opacity:0.65, maxNativeZoom:8, maxZoom:19, zIndex:650,
+           attribution:'雨雲 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}).addTo(mapObj);
+        const dt=new Date(f.time*1000);
+        const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
+        setRadarTime('☁️ 雨雲 '+hh+':'+mm+' 時点');
+      }
+      // 広域の雨の流れが見えるよう少し引く
+      try{ if(mapObj.getZoom()>11) mapObj.setZoom(9); }catch(e){}
+    }catch(e){ toast('雨雲データを取得できませんでした'); }
   }else{
     if(btn) btn.classList.remove('on');
     if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
     setRadarTime('');
+    // 背景を衛星写真に戻す
+    if(streetTiles && mapObj.hasLayer(streetTiles)) mapObj.removeLayer(streetTiles);
+    if(satTiles && !mapObj.hasLayer(satTiles)){ satTiles.addTo(mapObj); satTiles.bringToBack(); }
+    try{ reloadMapFit(); }catch(e){}
   }
+}
+function reloadMapFit(){ // 圃場が収まるズームに戻す
+  const b=[]; fieldList.forEach(f=>{ if(f.lat&&f.lon){ const r=fieldRing(f); r.forEach(p=>b.push(p)); } });
+  try{ if(b.length) mapObj.fitBounds(b,{padding:[40,40]}); }catch(e){}
 }
 
 async function initMap(){
   if(mapReady) return; mapReady=true;
   mapObj=L.map('map',{zoomControl:false}).setView([33.5563,130.1972],14);
   L.control.zoom({position:'bottomleft'}).addTo(mapObj);
-  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'衛星写真 © Esri, Maxar'}).addTo(mapObj);
+  satTiles=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'衛星写真 © Esri, Maxar'}).addTo(mapObj);
   mapObj.on('locationfound',e=>{
     if(locateForForm){ formCoord={lat:e.latlng.lat,lng:e.latlng.lng}; locateForForm=false; updateFormCoord(); return; }
     if(meMarker) mapObj.removeLayer(meMarker);
