@@ -247,6 +247,11 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #polyBar{position:absolute;left:0;right:0;bottom:0;z-index:1200;background:rgba(255,255,255,.97);border-top:1px solid var(--line);padding:10px 12px calc(env(safe-area-inset-bottom) + 10px);display:none;box-shadow:0 -6px 24px rgba(24,35,26,.18)}
 #polyBar.show{display:block}
 .maddbtn.on{background:#1a5e9a;color:#fff;border-color:#1a5e9a}
+#radarCtrl{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:1100;display:none;align-items:center;gap:6px;background:rgba(255,255,255,.96);border:1px solid var(--line);border-radius:999px;padding:6px 12px;box-shadow:0 4px 16px rgba(24,35,26,.22)}
+#radarCtrl.show{display:flex}
+#radarCtrl button{appearance:none;border:0;background:#1a5e9a;color:#fff;width:34px;height:34px;border-radius:50%;font-size:14px;cursor:pointer}
+#radarCtrl button:active{opacity:.85}
+#radarCtrl .rcnote{font-size:11.5px;color:var(--sub);font-weight:700;margin-left:4px}
 #polyBar .pbtitle{font-size:13.5px;font-weight:800;color:var(--stem-dk)}
 #polyBar .pbcount{margin-left:8px;font-size:12px;color:var(--soft);font-weight:700}
 #polyBar .pbmsg{font-size:12px;color:var(--sub);margin:4px 0 8px}
@@ -545,6 +550,12 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
       <span class="lg"><span class="dot todo"></span><span class="todo-t">未処理</span></span>
       <span class="lg" id="radarTime" style="color:#1a5e9a;font-weight:700"></span>
     </div>
+  </div>
+  <div id="radarCtrl">
+    <button id="radarPrev" title="前のコマ">◀</button>
+    <button id="radarPlay" title="再生／停止">▶</button>
+    <button id="radarNext" title="次のコマ">▶</button>
+    <span class="rcnote">雨雲の動き（過去2時間）</span>
   </div>
   <div id="polyBar">
     <div class="pbtitle">区画を編集中：<b id="polyName"></b><span id="polyCount" class="pbcount"></span></div>
@@ -1378,7 +1389,8 @@ function buildLayers(){
 async function reloadMap(){ await loadFieldStatus(); await loadFields(); if(typeof loadPlantings==='function'){ try{ await loadPlantings(); }catch(e){} } buildLayers(); }
 
 /* ============== 雨雲レーダー（RainViewer） ============== */
-let radarOn=false, radarLayer=null, radarHost=null, radarFrames=null, baseLayer=null;
+let radarOn=false, radarHost=null, radarFrames=null, baseLayer=null,
+    radarPos=0, radarTimer=null, radarPlaying=false, radarLayerCache={};
 const ESRI_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const OSM_URL='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
@@ -1393,7 +1405,6 @@ async function toggleRadar(force){
   const btn=document.getElementById('radarBtn');
   if(radarOn){
     if(btn) btn.classList.add('on');
-    // 背景を通常地図に切り替え（レイヤーを作り直し＝古いタイルが残らない）
     setBase(OSM_URL);
     try{
       if(!radarFrames){
@@ -1402,25 +1413,55 @@ async function toggleRadar(force){
       }
       if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); }
       else{
-        const f=radarFrames[radarFrames.length-1];
-        if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
-        radarLayer=L.tileLayer(radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png',
-          {opacity:0.85, maxNativeZoom:7, maxZoom:19, zIndex:650,
-           attribution:'雨雲 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}).addTo(mapObj);
-        const dt=new Date(f.time*1000);
-        const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
-        setRadarTime('☁️ 雨雲 '+hh+':'+mm+' 時点');
+        radarLayerCache={};
+        showRadarFrame(radarFrames.length-1); // 最新コマ
+        const cb=document.getElementById('radarCtrl'); if(cb) cb.classList.add('show');
+        updateRadarBtns();
       }
       try{ if(mapObj.getZoom()>10) mapObj.setZoom(8); }catch(e){}
     }catch(e){ toast('雨雲データを取得できませんでした'); }
   }else{
     if(btn) btn.classList.remove('on');
-    if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
+    radarStop();
+    Object.keys(radarLayerCache).forEach(k=>{ try{ mapObj.removeLayer(radarLayerCache[k]); }catch(e){} });
+    radarLayerCache={};
     setRadarTime('');
-    if(baseLayer) setBase(ESRI_URL); // 衛星写真に戻す
+    const cb=document.getElementById('radarCtrl'); if(cb) cb.classList.remove('show');
+    if(baseLayer) setBase(ESRI_URL);
     try{ reloadMapFit(); }catch(e){}
   }
 }
+function radarTileUrl(f){ return radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png'; }
+function getRadarLayer(f){
+  if(radarLayerCache[f.path]) return radarLayerCache[f.path];
+  const lyr=L.tileLayer(radarTileUrl(f),{opacity:0, maxNativeZoom:7, maxZoom:19, zIndex:650,
+    attribution:'雨雲 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'});
+  radarLayerCache[f.path]=lyr;
+  return lyr;
+}
+function showRadarFrame(i){
+  if(!radarFrames||!radarFrames.length) return;
+  radarPos=(i%radarFrames.length+radarFrames.length)%radarFrames.length;
+  const f=radarFrames[radarPos];
+  const lyr=getRadarLayer(f);
+  if(!mapObj.hasLayer(lyr)) lyr.addTo(mapObj);
+  Object.keys(radarLayerCache).forEach(k=>{ if(radarLayerCache[k]!==lyr) radarLayerCache[k].setOpacity(0); });
+  lyr.setOpacity(0.85);
+  const dt=new Date(f.time*1000);
+  const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
+  const isLast=(radarPos===radarFrames.length-1);
+  setRadarTime('☁️ 雨雲 '+hh+':'+mm+(isLast?' 時点（最新）':''));
+}
+function radarPlay(){
+  if(!radarFrames||radarFrames.length<2) return;
+  radarPlaying=true; updateRadarBtns();
+  radarTimer=setInterval(()=>{ showRadarFrame(radarPos+1); }, 600);
+}
+function radarStop(){
+  radarPlaying=false; if(radarTimer){ clearInterval(radarTimer); radarTimer=null; } updateRadarBtns();
+}
+function radarTogglePlay(){ if(radarPlaying) radarStop(); else radarPlay(); }
+function updateRadarBtns(){ const p=document.getElementById('radarPlay'); if(p) p.textContent=radarPlaying?'⏸':'▶'; }
 function reloadMapFit(){ // 圃場が収まるズームに戻す
   const b=[]; fieldList.forEach(f=>{ if(f.lat&&f.lon){ const r=fieldRing(f); r.forEach(p=>b.push(p)); } });
   try{ if(b.length) mapObj.fitBounds(b,{padding:[40,40]}); }catch(e){}
@@ -1782,6 +1823,9 @@ document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setVie
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
 document.getElementById('radarBtn').onclick=()=>toggleRadar();
+document.getElementById('radarPlay').onclick=()=>radarTogglePlay();
+document.getElementById('radarPrev').onclick=()=>{ radarStop(); showRadarFrame(radarPos-1); };
+document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(radarPos+1); };
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('whCloseBtn').onclick=()=>document.getElementById('workHistView').classList.remove('show');
 document.getElementById('whAddBtn').onclick=openWorkForm;
