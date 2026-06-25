@@ -1405,13 +1405,13 @@ async function toggleRadar(force){
         const f=radarFrames[radarFrames.length-1];
         if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
         radarLayer=L.tileLayer(radarHost+f.path+'/256/{z}/{x}/{y}/2/1_1.png',
-          {opacity:0.85, maxNativeZoom:8, maxZoom:19, zIndex:650,
+          {opacity:0.85, maxNativeZoom:7, maxZoom:19, zIndex:650,
            attribution:'雨雲 © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>'}).addTo(mapObj);
         const dt=new Date(f.time*1000);
         const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
         setRadarTime('☁️ 雨雲 '+hh+':'+mm+' 時点');
       }
-      try{ if(mapObj.getZoom()>11) mapObj.setZoom(9); }catch(e){}
+      try{ if(mapObj.getZoom()>10) mapObj.setZoom(8); }catch(e){}
     }catch(e){ toast('雨雲データを取得できませんでした'); }
   }else{
     if(btn) btn.classList.remove('on');
