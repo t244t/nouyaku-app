@@ -11,7 +11,7 @@
 :root{
   --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
   --stem:#2E6B3A; --stem-dk:#1F4F2A; --shoudoku:#1E6F7A; --jokusou:#B5651D;
-  --done:#00B4D8; --done-dk:#0077A3;
+  --done:#00B4D8; --done-dk:#0077A3; --partial:#E6A700;
   --warn:#9A6B00; --warn-bg:#FBF3DC; --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -323,8 +323,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .mlegend .lg{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.92);
   border-radius:999px;padding:5px 11px;font-size:11.5px;font-weight:700;box-shadow:var(--shadow)}
 .mlegend .dot{width:11px;height:11px;border-radius:3px}
-.dot.done{background:var(--done)} .dot.todo{background:var(--jokusou)}
-.mlegend .done-t{color:var(--done-dk)} .mlegend .todo-t{color:var(--jokusou)}
+.dot.done{background:var(--done)} .dot.todo{background:var(--jokusou)} .dot.partial{background:var(--partial)}
+.mlegend .done-t{color:var(--done-dk)} .mlegend .todo-t{color:var(--jokusou)} .mlegend .partial-t{color:var(--partial)}
 .fld-label{background:rgba(18,26,18,.62);color:#fff;font-size:11px;font-weight:700;
   padding:2px 7px;border-radius:7px;border:0;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.4);text-align:center;line-height:1.3}
 .fld-label .fld-crop{font-size:10px;font-weight:600;color:#cdeacd;margin-top:1px}
@@ -364,6 +364,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .fh .grp{font-size:12px;color:var(--soft)}
 .fstatus{font-size:12px;font-weight:800;padding:5px 11px;border-radius:999px;white-space:nowrap}
 .fstatus.done{background:#E0F5FA;color:var(--done-dk)}
+.fstatus.partial{background:#FBF1D0;color:#9a7a00}
 .fstatus.todo{background:var(--warn-bg);color:var(--jokusou)}
 .weed{margin-top:12px;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 13px}
 .weed .t{font-size:11px;letter-spacing:.1em;color:var(--soft);font-weight:700}
@@ -516,6 +517,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     </div>
     <div class="mlegend">
       <span class="lg"><span class="dot done"></span><span class="done-t">除草済み</span></span>
+      <span class="lg"><span class="dot partial"></span><span class="partial-t">一部済み</span></span>
       <span class="lg"><span class="dot todo"></span><span class="todo-t">未処理</span></span>
     </div>
   </div>
@@ -1153,7 +1155,7 @@ const FIELDS_SEED = [
  {name:"西貝塚畑",lat:33.574992,lon:130.142253,area:1100,"所有":"借地","所有者":"熊本氏","栽培作物":"玉ねぎ、にんにく、人参、ホウレン草","住所":"糸島市志摩西貝塚","備考":"2025.11〜開始"}
 ];
 const WEED_WINDOW_DAYS = 30; // この日数以内に除草記録があれば「除草済み」
-let mapObj=null, mapRecords=[], mapWorkRecords=[], mapStatus={}, fieldList=[], fieldLayer=null, layerByName={}, meMarker=null, mapReady=false, formCoord=null, locateForForm=false, workCat=null;
+let mapObj=null, mapRecords=[], mapWorkRecords=[], mapStatus={}, fieldList=[], fieldLayer=null, layerByName={}, meMarker=null, mapReady=false, formCoord=null, locateForForm=false, workCat=null, weedRange='全部';
 
 function pd(s){ const m=String(s||'').match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/); return m? new Date(+m[1],+m[2]-1,+m[3]):null; }
 function daysAgo(d){ return Math.floor((Date.now()-d.getTime())/86400000); }
@@ -1275,18 +1277,22 @@ async function loadFieldStatus(){
   mapRecords.forEach(rec=>{
     const f=String(rec['圃場']||''); if(!f)return;
     const d=pd(rec['散布日']); const ku=String(rec['区分']||'');
-    if(!mapStatus[f]) mapStatus[f]={done:false,lastWeed:null,weedCount:0};
+    if(!mapStatus[f]) mapStatus[f]={done:false,state:'todo',lastWeed:null,lastWeedRange:null,weedCount:0};
     const s=mapStatus[f];
-    if(ku.indexOf('除草')>=0){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)) s.lastWeed=d; }
+    if(ku.indexOf('除草')>=0){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)){ s.lastWeed=d; s.lastWeedRange='全部'; } }
   });
   mapWorkRecords.forEach(rec=>{
     const f=String(rec['圃場']||''); if(!f)return;
     const d=pd(rec['作業日']); const ka=String(rec['カテゴリ']||'');
-    if(!mapStatus[f]) mapStatus[f]={done:false,lastWeed:null,weedCount:0};
+    if(!mapStatus[f]) mapStatus[f]={done:false,state:'todo',lastWeed:null,lastWeedRange:null,weedCount:0};
     const s=mapStatus[f];
-    if(ka==='除草'){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)) s.lastWeed=d; }
+    if(ka==='除草'){ s.weedCount++; if(d&&(!s.lastWeed||d>s.lastWeed)){ s.lastWeed=d; s.lastWeedRange=(String(rec['範囲']||'')==='一部')?'一部':'全部'; } }
   });
-  Object.values(mapStatus).forEach(s=>{ s.done = s.lastWeed && daysAgo(s.lastWeed)<=WEED_WINDOW_DAYS; });
+  Object.values(mapStatus).forEach(s=>{
+    if(s.lastWeed && daysAgo(s.lastWeed)<=WEED_WINDOW_DAYS){ s.state=(s.lastWeedRange==='一部')?'partial':'done'; }
+    else s.state='todo';
+    s.done=(s.state==='done');
+  });
 }
 
 // 圃場ポップアップ用：散布記録＋作業記録を統合した「直近の作業」リスト
@@ -1314,7 +1320,7 @@ async function loadFields(){
   fieldList = (list&&list.length)? list : FIELDS_SEED.slice();
 }
 
-function fStyle(name){ const done=mapStatus[name]&&mapStatus[name].done; const c=done?getCss('--done'):getCss('--jokusou'); return {color:c,weight:3,opacity:1,fillColor:c,fillOpacity:.25}; }
+function fStyle(name){ const st=(mapStatus[name]&&mapStatus[name].state)||'todo'; const c= st==='done'?getCss('--done') : st==='partial'?getCss('--partial') : getCss('--jokusou'); return {color:c,weight:3,opacity:1,fillColor:c,fillOpacity:.25}; }
 
 function buildLayers(){
   if(fieldLayer){ mapObj.removeLayer(fieldLayer); }
@@ -1359,7 +1365,7 @@ function openField(f){
   const areaTxt=f.area?('<b>'+comma(f.area)+' ㎡</b>'):'<b class="empty">未登録</b>';
   document.getElementById('fSheetIn').innerHTML=
     '<div class="fh"><div><div class="nm">'+esc(name)+'</div><div class="grp">圃場</div></div>'+
-      '<span class="fstatus '+(s.done?'done':'todo')+'">'+(s.done?'除草済み':'未処理')+'</span></div>'+
+      '<span class="fstatus '+(s.state||'todo')+'">'+(s.state==='done'?'除草済み':s.state==='partial'?'一部済み（刈り残しあり）':'未処理')+'</span></div>'+
     '<div class="weed"><div class="t">最終除草</div>'+weedLine+'</div>'+
     '<div class="fkv">'+
       '<div><span>栽培作物</span>'+meta('栽培作物')+'</div>'+
@@ -1446,7 +1452,7 @@ async function openWorkForm(){
   if(!fieldList.length) await loadFields(); // 圃場マップを開かずに使う場合の保険
   workCat=null;
   editingWorkId=null; editingWorkRec=null; editPrefillPending=false;
-  pendingWorkPhotos=[];
+  pendingWorkPhotos=[]; weedRange='全部';
   await loadWorkHistoryData();
   renderWorkForm();
   document.getElementById('fScrim').classList.add('show');
@@ -1505,6 +1511,10 @@ function renderWorkForm(){
     '<div class="rec">'+
       (editingWorkId?('<div class="editbar"><span>修正中（保存すると上書きされます）</span><button id="w_cancel">新規に戻る</button></div>'):'')+
       '<div class="field"><label>カテゴリー</label><div class="catgrid">'+catBtns+'</div>'+subHtml+'</div>'+
+      (workCat==='除草' ? '<div class="field"><label>除草した範囲</label><div class="catgrid" id="weedRangeBtns">'+
+        '<button type="button" class="catbtn rng" data-r="全部" aria-pressed="'+(weedRange!=='一部'?'true':'false')+'">全部刈った</button>'+
+        '<button type="button" class="catbtn rng" data-r="一部" aria-pressed="'+(weedRange==='一部'?'true':'false')+'">一部だけ（刈り残しあり）</button>'+
+      '</div><div class="note" style="margin-top:5px">「一部だけ」を選ぶと、地図でその圃場が黄色（一部済み）になります。刈り残した場所はメモに書いておくと分かりやすいです。</div></div>' : '')+
       '<div class="field"><label>圃場</label><select id="w_field">'+fieldOpts+'</select></div>'+
       '<div class="two">'+
         '<div class="field"><label>作業日</label><input id="w_date" type="date" value="'+today+'"></div>'+
@@ -1519,7 +1529,8 @@ function renderWorkForm(){
       '<div class="eyebrow" style="margin-top:16px">最近の作業記録</div>'+
       '<div id="wHistWrap">'+workHistoryHtml()+'</div>'+
     '</div>';
-  document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{ workCat=b.dataset.cat; renderWorkForm(); });
+  document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{ if(b.classList.contains('rng')) return; workCat=b.dataset.cat; renderWorkForm(); });
+  document.querySelectorAll('.rng').forEach(b=>b.onclick=()=>{ weedRange=b.dataset.r; document.querySelectorAll('.rng').forEach(x=>x.setAttribute('aria-pressed', x===b?'true':'false')); });
   document.querySelectorAll('.subchip').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.subchip').forEach(x=>x.setAttribute('aria-pressed','false'));
     b.setAttribute('aria-pressed','true');
@@ -1540,7 +1551,7 @@ function editWork(id){
   const r=workHistory.find(function(x){ return String(x['作業ID'])===id; });
   if(!r){ toast('対象の記録が見つかりません'); return; }
   editingWorkId=id; editingWorkRec=r; editPrefillPending=true;
-  workCat=r['カテゴリ']||null; pendingWorkPhotos=[];
+  workCat=r['カテゴリ']||null; pendingWorkPhotos=[]; weedRange=(r['範囲']==='一部')?'一部':'全部';
   renderWorkForm();
   const sh=document.getElementById('fSheet'); if(sh) sh.scrollTop=0;
 }
@@ -1593,7 +1604,8 @@ function saveWork(){
   if(!content){ toast('作業内容を選ぶか入力してください'); return; }
   if(!CONFIG.GAS_URL){ toast('GAS未接続のため保存できません'); return; }
   const rec={line_user:CONFIG.LINE_USER, 記録者:RECORDER, 圃場:valOf('w_field'), 作業日:valOf('w_date'),
-    カテゴリ:workCat, 作業内容:content, 時間:valOf('w_hours'), メモ:valOf('w_memo')};
+    カテゴリ:workCat, 作業内容:content, 時間:valOf('w_hours'), メモ:valOf('w_memo'),
+    範囲:(workCat==='除草'?weedRange:'')};
   const btn=document.getElementById('w_save'); if(guardBtn(btn)===false) return;
 
   // 修正モード：上書き保存
