@@ -272,12 +272,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #toolView.show{display:flex}
 #toolBody{padding:10px 12px 40px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start;overflow:auto}
 .tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column}
-.tcard .timg{width:100%;aspect-ratio:4/3;background:#eef1ea center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+.tcard .timg{width:100%;aspect-ratio:16/11;background:#eef1ea center/cover no-repeat;display:flex;align-items:center;justify-content:center}
 .tcard .timg .ph{color:#aeb8aa;font-size:28px}
 .tcard .tin{padding:8px 10px}
 .tcard .tnm{font-size:14px;font-weight:800;color:var(--stem-dk);line-height:1.25}
 .tcard .tmeta{font-size:11.5px;color:var(--sub);margin-top:3px}
-.tcard .tst{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+.tcard .twh{display:inline-block;margin-top:6px;margin-right:5px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF3EA;color:var(--stem-dk)}
+.tst{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+.toolfilter{display:flex;gap:7px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
+.toolfilter .fchip{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--stem-dk);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.toolfilter .fchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
 .tst.使用中{background:#E0F5FA;color:var(--done-dk)} .tst.保管中{background:#E4F0E6;color:var(--stem-dk)}
 .tst.点検中{background:#FBF1D0;color:#9a7a00} .tst.故障{background:var(--warn-bg);color:var(--jokusou)}
 .tprev{width:100%;aspect-ratio:4/3;border-radius:10px;background:#eef1ea center/cover no-repeat;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#aeb8aa;font-size:30px}
@@ -643,6 +647,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <button class="mclose" id="toolCloseBtn">閉じる</button>
   </div>
   <div class="callegend"><span style="color:var(--soft)">農機具の一覧です。タップで詳細・編集ができます。</span></div>
+  <div id="toolFilter" class="toolfilter"></div>
   <div id="toolBody" class="calbody"></div>
 </div>
 
@@ -1850,7 +1855,7 @@ document.getElementById('openWork').onclick=openWorkForm;
 const TOOL_KINDS=['トラクター','管理機','耕運機','田植機','コンバイン','刈払機','草刈機','噴霧器・防除機','運搬車・軽トラ','ポンプ','その他'];
 const TOOL_WAREHOUSES=['ねぎぼうず倉庫','飯盛倉庫','貝塚倉庫','ファーム倉庫'];
 const TOOL_STATES=['使用中','保管中','点検中','故障'];
-let toolList=[], toolPhotoMap={}, editingToolId=null, pendingToolPhoto=null;
+let toolList=[], toolPhotoMap={}, editingToolId=null, pendingToolPhoto=null, toolWh='すべて';
 async function loadToolData(){
   toolList=[]; toolPhotoMap={};
   if(!CONFIG.GAS_URL) return;
@@ -1867,12 +1872,27 @@ async function openTools(){
   document.getElementById('toolView').classList.add('show');
   document.getElementById('toolBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
   await loadToolData();
-  renderToolList();
+  renderToolFilter(); renderToolList();
+}
+function renderToolFilter(){
+  const box=document.getElementById('toolFilter'); if(!box) return;
+  const cnt={};
+  toolList.forEach(t=>{ const w=String(t['保管倉庫']||'その他'); cnt[w]=(cnt[w]||0)+1; });
+  const items=['すべて'].concat(TOOL_WAREHOUSES);
+  // 4倉庫以外（その他）があれば末尾に追加
+  Object.keys(cnt).forEach(w=>{ if(items.indexOf(w)<0) items.push(w); });
+  box.innerHTML=items.map(function(w){
+    const n=(w==='すべて')?toolList.length:(cnt[w]||0);
+    return '<button class="fchip'+(toolWh===w?' on':'')+'" data-w="'+esc(w)+'">'+esc(w)+'（'+n+'）</button>';
+  }).join('');
+  box.querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ toolWh=b.dataset.w; renderToolFilter(); renderToolList(); });
 }
 function renderToolList(){
   const box=document.getElementById('toolBody'); if(!box) return;
-  if(!toolList.length){ box.innerHTML='<div class="note" style="grid-column:1/-1;padding:16px">まだ農機具の登録がありません。「＋ 追加」から登録できます。</div>'; return; }
-  box.innerHTML=toolList.map(function(t){
+  let list=toolList;
+  if(toolWh!=='すべて') list=toolList.filter(t=>String(t['保管倉庫']||'その他')===toolWh);
+  if(!list.length){ box.innerHTML='<div class="note" style="grid-column:1/-1;padding:16px">'+(toolList.length?'この倉庫の農機具はありません。':'まだ農機具の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
+  box.innerHTML=list.map(function(t){
     const id=esc(t['農機具ID']||'');
     const img=toolPhotoMap[t['農機具ID']]||'';
     const imgHtml=img?('<div class="timg" style="background-image:url('+img+')"></div>'):'<div class="timg"><span class="ph">🚜</span></div>';
@@ -1881,8 +1901,8 @@ function renderToolList(){
     return '<div class="tcard" onclick="openToolDetail(\''+id+'\')">'+imgHtml+
       '<div class="tin"><div class="tnm">'+esc(t['名前']||'(名称未設定)')+'</div>'+
       (meta?'<div class="tmeta">'+meta+'</div>':'')+
-      '<div class="tmeta">📍 '+esc(t['保管倉庫']||'—')+'</div>'+
-      '<span class="tst '+st+'">'+st+'</span></div></div>';
+      '<div><span class="twh">📍 '+esc(t['保管倉庫']||'—')+'</span><span class="tst '+st+'">'+st+'</span></div>'+
+      '</div></div>';
   }).join('');
 }
 function toolFormHtml(t){
@@ -1943,7 +1963,7 @@ async function saveTool(){
     }
     toast('保存しました');
     closeFieldSheet();
-    await loadToolData(); renderToolList();
+    await loadToolData(); renderToolFilter(); renderToolList();
   }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
   finally{ unguardBtn(btn); }
 }
@@ -1953,7 +1973,7 @@ async function deleteTool(id){
   if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
   try{
     const j=await (await fetch(CONFIG.GAS_URL+'?action=deleteTool&'+new URLSearchParams({id:id}))).json();
-    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadToolData(); renderToolList(); }
+    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadToolData(); renderToolFilter(); renderToolList(); }
     else toast('削除に失敗しました：'+esc((j&&j.error)||''));
   }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
 }
