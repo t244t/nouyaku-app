@@ -268,6 +268,21 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #workHistView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #workHistView.show{display:flex}
 #whBody{padding:8px 10px 40px}
+#toolView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#toolView.show{display:flex}
+#toolBody{padding:10px 12px 40px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start;overflow:auto}
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column}
+.tcard .timg{width:100%;aspect-ratio:4/3;background:#eef1ea center/cover no-repeat;display:flex;align-items:center;justify-content:center}
+.tcard .timg .ph{color:#aeb8aa;font-size:28px}
+.tcard .tin{padding:8px 10px}
+.tcard .tnm{font-size:14px;font-weight:800;color:var(--stem-dk);line-height:1.25}
+.tcard .tmeta{font-size:11.5px;color:var(--sub);margin-top:3px}
+.tcard .tst{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
+.tst.使用中{background:#E0F5FA;color:var(--done-dk)} .tst.保管中{background:#E4F0E6;color:var(--stem-dk)}
+.tst.点検中{background:#FBF1D0;color:#9a7a00} .tst.故障{background:var(--warn-bg);color:var(--jokusou)}
+.tprev{width:100%;aspect-ratio:4/3;border-radius:10px;background:#eef1ea center/cover no-repeat;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#aeb8aa;font-size:30px}
+.row2{display:flex;gap:10px}
+.row2>.field{flex:1;min-width:0}
 .gdcrops{display:flex;flex-wrap:wrap;gap:8px;padding:12px;flex:0 0 auto;max-height:34vh;overflow:auto;border-bottom:1px solid var(--line)}
 .gdchip{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 15px;font-size:13.5px;font-weight:700;color:var(--stem-dk);cursor:pointer}
 .gdchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
@@ -490,8 +505,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
         <span>作業履歴</span>
       </button>
-      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
-        <span class="badge">準備中</span>
+      <button class="tile" id="openTools">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17V8h7l3 4h2v5"/></svg>
         <span>農機具</span>
       </button>
@@ -621,6 +635,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="gdScrim"></div>
 <div id="gdSheet"><div class="grab"></div><div class="sheet-in" id="gdSheetIn"></div></div>
+
+<div id="toolView">
+  <div class="calhead">
+    <h2>農機具</h2>
+    <button class="maddbtn" id="toolAddBtn">＋ 追加</button>
+    <button class="mclose" id="toolCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">農機具の一覧です。タップで詳細・編集ができます。</span></div>
+  <div id="toolBody" class="calbody"></div>
+</div>
 
 <div id="workHistView">
   <div class="calhead">
@@ -1822,11 +1846,125 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+/* ============== 農機具 ============== */
+const TOOL_KINDS=['トラクター','管理機','耕運機','田植機','コンバイン','刈払機','草刈機','噴霧器・防除機','運搬車・軽トラ','ポンプ','その他'];
+const TOOL_WAREHOUSES=['ねぎぼうず倉庫','飯盛倉庫','貝塚倉庫','ファーム倉庫'];
+const TOOL_STATES=['使用中','保管中','点検中','故障'];
+let toolList=[], toolPhotoMap={}, editingToolId=null, pendingToolPhoto=null;
+async function loadToolData(){
+  toolList=[]; toolPhotoMap={};
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listTools')).json(); toolList=(j&&j.tools)?j.tools:[]; }catch(e){ toolList=[]; }
+  try{ const j2=await (await fetch(CONFIG.GAS_URL+'?action=listPhotos')).json();
+    const ph=(j2&&j2.photos)?j2.photos:[];
+    ph.forEach(function(r){ if(String(r['種別'])==='農機具'){ const k=String(r['記録ID']); if(!toolPhotoMap[k]) toolPhotoMap[k]=driveImg(r['URL']); } });
+  }catch(e){}
+}
+function driveImg(url){ // DriveのURLを画像表示用に変換
+  const m=String(url||'').match(/[-\w]{25,}/); return m?('https://lh3.googleusercontent.com/d/'+m[0]):'';
+}
+async function openTools(){
+  document.getElementById('toolView').classList.add('show');
+  document.getElementById('toolBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
+  await loadToolData();
+  renderToolList();
+}
+function renderToolList(){
+  const box=document.getElementById('toolBody'); if(!box) return;
+  if(!toolList.length){ box.innerHTML='<div class="note" style="grid-column:1/-1;padding:16px">まだ農機具の登録がありません。「＋ 追加」から登録できます。</div>'; return; }
+  box.innerHTML=toolList.map(function(t){
+    const id=esc(t['農機具ID']||'');
+    const img=toolPhotoMap[t['農機具ID']]||'';
+    const imgHtml=img?('<div class="timg" style="background-image:url('+img+')"></div>'):'<div class="timg"><span class="ph">🚜</span></div>';
+    const meta=[t['メーカー'],t['型番']].filter(function(x){return x;}).map(esc).join(' ');
+    const st=esc(t['状態']||'保管中');
+    return '<div class="tcard" onclick="openToolDetail(\''+id+'\')">'+imgHtml+
+      '<div class="tin"><div class="tnm">'+esc(t['名前']||'(名称未設定)')+'</div>'+
+      (meta?'<div class="tmeta">'+meta+'</div>':'')+
+      '<div class="tmeta">📍 '+esc(t['保管倉庫']||'—')+'</div>'+
+      '<span class="tst '+st+'">'+st+'</span></div></div>';
+  }).join('');
+}
+function toolFormHtml(t){
+  t=t||{};
+  const kindOpts=TOOL_KINDS.map(k=>'<option'+(t['種類']===k?' selected':'')+'>'+esc(k)+'</option>').join('');
+  const whOpts=TOOL_WAREHOUSES.map(w=>'<option'+(t['保管倉庫']===w?' selected':'')+'>'+esc(w)+'</option>').join('')+'<option'+(t['保管倉庫']&&TOOL_WAREHOUSES.indexOf(t['保管倉庫'])<0?' selected':'')+'>その他</option>';
+  const stOpts=TOOL_STATES.map(s=>'<option'+((t['状態']||'保管中')===s?' selected':'')+'>'+esc(s)+'</option>').join('');
+  const img=t['農機具ID']?(toolPhotoMap[t['農機具ID']]||''):'';
+  const prev=pendingToolPhoto?pendingToolPhoto.dataUrl:img;
+  return '<div class="fh"><div class="nm">'+(t['農機具ID']?'農機具を編集':'農機具を追加')+'</div></div>'+
+    '<div class="tprev" id="toolPrev"'+(prev?(' style="background-image:url('+prev+')"'):'')+'>'+(prev?'':'🚜')+'</div>'+
+    '<div class="field"><label>写真（撮影またはアルバム）</label><input id="t_photo" type="file" accept="image/*"></div>'+
+    '<div class="field"><label>名前</label><input id="t_name" value="'+esc(t['名前']||'')+'" placeholder="例：クボタ管理機"></div>'+
+    '<div class="field"><label>種類</label><select id="t_kind">'+kindOpts+'</select></div>'+
+    '<div class="row2"><div class="field"><label>メーカー</label><input id="t_maker" value="'+esc(t['メーカー']||'')+'" placeholder="例：クボタ"></div>'+
+    '<div class="field"><label>型番</label><input id="t_model" value="'+esc(t['型番']||'')+'" placeholder="例：TMA250"></div></div>'+
+    '<div class="row2"><div class="field"><label>保管倉庫</label><select id="t_wh">'+whOpts+'</select></div>'+
+    '<div class="field"><label>状態</label><select id="t_state">'+stOpts+'</select></div></div>'+
+    '<div class="field"><label>備考（任意）</label><input id="t_memo" value="'+esc(t['備考']||'')+'" placeholder="整備メモ・付属品など"></div>'+
+    '<button class="save" id="t_save">'+(t['農機具ID']?'上書き保存':'登録する')+'</button>'+
+    (t['農機具ID']?'<button class="save" id="t_del" style="background:#fff;color:#b3261e;border:1px solid #e6b4ae;margin-top:8px">この農機具を削除</button>':'');
+}
+function openToolForm(t){
+  editingToolId=(t&&t['農機具ID'])?t['農機具ID']:null;
+  pendingToolPhoto=null;
+  const sh=document.getElementById('fSheetIn'); if(!sh){ return; }
+  sh.innerHTML=toolFormHtml(t||{});
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  document.getElementById('fSheet').scrollTop=0;
+  const pi=document.getElementById('t_photo');
+  if(pi) pi.onchange=async function(e){ const f=e.target.files&&e.target.files[0]; if(!f) return;
+    const d=await resizeImage(f,1280); if(!d){ toast('画像を読み込めませんでした'); return; }
+    pendingToolPhoto={name:(f.name||('tool'+Date.now()+'.jpg')),dataUrl:d,mime:'image/jpeg'};
+    const pv=document.getElementById('toolPrev'); if(pv){ pv.style.backgroundImage='url('+d+')'; pv.textContent=''; } };
+  const sv=document.getElementById('t_save'); if(sv) sv.onclick=saveTool;
+  const dl=document.getElementById('t_del'); if(dl) dl.onclick=()=>deleteTool(editingToolId);
+}
+function openToolDetail(id){ const t=toolList.find(x=>String(x['農機具ID'])===id); if(t) openToolForm(t); }
+async function saveTool(){
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const v=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+  const name=v('t_name'); if(!name){ toast('名前を入力してください'); return; }
+  const rec={名前:name, 種類:v('t_kind'), メーカー:v('t_maker'), 型番:v('t_model'),
+    保管倉庫:v('t_wh'), 状態:v('t_state'), 備考:v('t_memo'), 記録者:RECORDER};
+  const btn=document.getElementById('t_save'); if(guardBtn(btn)===false) return;
+  try{
+    let toolId=editingToolId;
+    if(editingToolId){
+      await fetch(CONFIG.GAS_URL+'?action=updateTool&'+new URLSearchParams(Object.assign({id:editingToolId},rec)));
+    }else{
+      const j=await (await fetch(CONFIG.GAS_URL+'?action=addTool&'+new URLSearchParams(rec))).json();
+      toolId=(j&&j.id)?j.id:null;
+    }
+    if(pendingToolPhoto && toolId){
+      try{ await fetch(CONFIG.GAS_URL,{method:'POST',body:JSON.stringify({action:'uploadPhoto',記録ID:toolId,種別:'農機具',
+        ファイル名:pendingToolPhoto.name,mimeType:pendingToolPhoto.mime,dataB64:pendingToolPhoto.dataUrl})}); }catch(e){}
+    }
+    toast('保存しました');
+    closeFieldSheet();
+    await loadToolData(); renderToolList();
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
+async function deleteTool(id){
+  if(!id) return;
+  if(!confirm('この農機具を削除します。よろしいですか？\n（この操作は取り消せません）')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=deleteTool&'+new URLSearchParams({id:id}))).json();
+    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadToolData(); renderToolList(); }
+    else toast('削除に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
+}
 document.getElementById('radarBtn').onclick=()=>toggleRadar();
 document.getElementById('radarPlay').onclick=()=>radarTogglePlay();
 document.getElementById('radarPrev').onclick=()=>{ radarStop(); showRadarFrame(radarPos-1); };
 document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(radarPos+1); };
 document.getElementById('openWorkHist').onclick=openWorkHist;
+document.getElementById('openTools').onclick=openTools;
+document.getElementById('toolCloseBtn').onclick=()=>document.getElementById('toolView').classList.remove('show');
+document.getElementById('toolAddBtn').onclick=()=>openToolForm(null);
 document.getElementById('whCloseBtn').onclick=()=>document.getElementById('workHistView').classList.remove('show');
 document.getElementById('whAddBtn').onclick=openWorkForm;
 document.getElementById('openDiag').onclick=openDiag;
