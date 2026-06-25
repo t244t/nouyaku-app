@@ -270,6 +270,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #whBody{padding:8px 10px 40px}
 #toolView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #toolView.show{display:flex}
+#stockView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#stockView.show{display:flex}
+#stockBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #toolBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 .tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:stretch}
 .tcard .timgwrap{width:116px;height:92px;flex:0 0 116px;background:#eef1ea;overflow:hidden;display:flex;align-items:center;justify-content:center}
@@ -473,8 +476,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
         <span>防除履歴</span>
       </a>
-      <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
-        <span class="badge">準備中</span>
+      <button class="tile" id="openStock">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7l3-4h12l3 4"/><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 12h6"/></svg>
         <span>農薬在庫</span>
       </button>
@@ -640,6 +642,17 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="gdScrim"></div>
 <div id="gdSheet"><div class="grab"></div><div class="sheet-in" id="gdSheetIn"></div></div>
+
+<div id="stockView">
+  <div class="calhead">
+    <h2>農薬在庫</h2>
+    <button class="maddbtn" id="stockAddBtn">＋ 追加</button>
+    <button class="mclose" id="stockCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">農薬の在庫一覧です。タップで詳細・編集ができます。</span></div>
+  <div id="stockFilter" class="toolfilter"></div>
+  <div id="stockBody" class="calbody"></div>
+</div>
 
 <div id="toolView">
   <div class="calhead">
@@ -1852,6 +1865,140 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+/* ============== 農薬在庫 ============== */
+const STOCK_CATS=['除草剤','殺菌剤','殺虫剤'];
+const STOCK_UNITS=['本','袋','缶','箱','kg','g','L','mL'];
+let stockList=[], stockPhotoMap={}, editingStockId=null, pendingStockPhoto=null, stockCat='すべて';
+async function loadStockData(){
+  stockList=[]; stockPhotoMap={};
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listStock')).json(); stockList=(j&&j.stock)?j.stock:[]; }catch(e){ stockList=[]; }
+  try{ const j2=await (await fetch(CONFIG.GAS_URL+'?action=listPhotos')).json();
+    const ph=(j2&&j2.photos)?j2.photos:[];
+    ph.forEach(function(r){ if(String(r['種別'])==='農薬在庫'){ const k=String(r['記録ID']); if(!stockPhotoMap[k]) stockPhotoMap[k]=driveImg(r['URL']); } });
+  }catch(e){}
+}
+async function openStock(){
+  document.getElementById('stockView').classList.add('show');
+  document.getElementById('stockBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
+  await loadStockData();
+  renderStockFilter(); renderStockList();
+}
+function renderStockFilter(){
+  const box=document.getElementById('stockFilter'); if(!box) return;
+  const cnt={};
+  stockList.forEach(t=>{ const c=String(t['カテゴリ']||'その他'); cnt[c]=(cnt[c]||0)+1; });
+  const items=['すべて'].concat(STOCK_CATS);
+  Object.keys(cnt).forEach(c=>{ if(items.indexOf(c)<0) items.push(c); });
+  box.innerHTML=items.map(function(c){
+    const n=(c==='すべて')?stockList.length:(cnt[c]||0);
+    return '<button class="fchip'+(stockCat===c?' on':'')+'" data-c="'+esc(c)+'">'+esc(c)+'（'+n+'）</button>';
+  }).join('');
+  box.querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ stockCat=b.dataset.c; renderStockFilter(); renderStockList(); });
+}
+function expiryNote(s){ // 使用期限の状態
+  const m=String(s||'').match(/^(\d{4})-(\d{1,2})-(\d{1,2})/); if(!m) return '';
+  const d=new Date(+m[1],+m[2]-1,+m[3]); const now=new Date(); now.setHours(0,0,0,0);
+  const days=Math.round((d-now)/86400000);
+  if(days<0) return '<span class="tst 故障">期限切れ</span>';
+  if(days<=60) return '<span class="tst 点検中">期限まぢか</span>';
+  return '';
+}
+function renderStockList(){
+  const box=document.getElementById('stockBody'); if(!box) return;
+  let list=stockList;
+  if(stockCat!=='すべて') list=stockList.filter(t=>String(t['カテゴリ']||'その他')===stockCat);
+  if(!list.length){ box.innerHTML='<div class="note" style="padding:16px">'+(stockList.length?'このカテゴリーの在庫はありません。':'まだ農薬在庫の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
+  box.innerHTML=list.map(function(t){
+    const id=esc(t['在庫ID']||'');
+    const img=stockPhotoMap[t['在庫ID']]||'';
+    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="" width="116" height="92">'):'<span class="ph">🧴</span>')+'</div>';
+    const qty=[t['在庫量'],t['単位']].filter(function(x){return x!==''&&x!=null;}).map(esc).join(' ');
+    const meta=[t['メーカー'],t['登録番号']].filter(function(x){return x;}).map(esc).join(' / ');
+    return '<div class="tcard" onclick="openStockDetail(\''+id+'\')">'+imgHtml+
+      '<div class="tin"><div class="tnm">'+esc(t['農薬名']||'(名称未設定)')+'</div>'+
+      (meta?'<div class="tmeta">'+meta+'</div>':'')+
+      '<div class="tmeta">在庫：'+(qty||'—')+'</div>'+
+      '<div><span class="twh">📍 '+esc(t['保管倉庫']||'—')+'</span><span class="twh" style="background:#EAF0F6;color:#1a5e9a">'+esc(t['カテゴリ']||'—')+'</span>'+expiryNote(t['使用期限'])+'</div>'+
+      '</div></div>';
+  }).join('');
+}
+function stockFormHtml(t){
+  t=t||{};
+  const catOpts=STOCK_CATS.map(c=>'<option'+(t['カテゴリ']===c?' selected':'')+'>'+esc(c)+'</option>').join('');
+  const whOpts=TOOL_WAREHOUSES.map(w=>'<option'+(t['保管倉庫']===w?' selected':'')+'>'+esc(w)+'</option>').join('')+'<option'+(t['保管倉庫']&&TOOL_WAREHOUSES.indexOf(t['保管倉庫'])<0?' selected':'')+'>その他</option>';
+  const unitOpts='<option value="">単位</option>'+STOCK_UNITS.map(u=>'<option'+(t['単位']===u?' selected':'')+'>'+esc(u)+'</option>').join('');
+  const img=t['在庫ID']?(stockPhotoMap[t['在庫ID']]||''):'';
+  const prev=pendingStockPhoto?pendingStockPhoto.dataUrl:img;
+  return '<div class="fh"><div class="nm">'+(t['在庫ID']?'農薬在庫を編集':'農薬在庫を追加')+'</div></div>'+
+    '<div class="tprev" id="stockPrev"'+(prev?(' style="background-image:url('+prev+')"'):'')+'>'+(prev?'':'🧴')+'</div>'+
+    '<div class="field"><label>ラベル写真（任意）</label><input id="s_photo" type="file" accept="image/*"></div>'+
+    '<div class="field"><label>農薬名</label><input id="s_name" value="'+esc(t['農薬名']||'')+'" placeholder="例：モスピラン"></div>'+
+    '<div class="field"><label>カテゴリー</label><select id="s_cat">'+catOpts+'</select></div>'+
+    '<div class="row2"><div class="field"><label>メーカー</label><input id="s_maker" value="'+esc(t['メーカー']||'')+'" placeholder="例：日本曹達"></div>'+
+    '<div class="field"><label>登録番号（任意）</label><input id="s_regno" value="'+esc(t['登録番号']||'')+'" placeholder="第○○号"></div></div>'+
+    '<div class="row2"><div class="field"><label>在庫量</label><input id="s_qty" value="'+esc(t['在庫量']||'')+'" inputmode="decimal" placeholder="例：3"></div>'+
+    '<div class="field"><label>単位</label><select id="s_unit">'+unitOpts+'</select></div></div>'+
+    '<div class="field"><label>保管倉庫</label><select id="s_wh">'+whOpts+'</select></div>'+
+    '<div class="row2"><div class="field"><label>購入日（任意）</label><input id="s_buy" type="date" value="'+esc(t['購入日']||'')+'"></div>'+
+    '<div class="field"><label>使用期限（任意）</label><input id="s_exp" type="date" value="'+esc(t['使用期限']||'')+'"></div></div>'+
+    '<div class="field"><label>備考（任意）</label><input id="s_memo" value="'+esc(t['備考']||'')+'" placeholder="対象・希釈倍率など"></div>'+
+    '<button class="save" id="s_save">'+(t['在庫ID']?'上書き保存':'登録する')+'</button>'+
+    (t['在庫ID']?'<button class="save" id="s_del" style="background:#fff;color:#b3261e;border:1px solid #e6b4ae;margin-top:8px">この在庫を削除</button>':'');
+}
+function openStockForm(t){
+  editingStockId=(t&&t['在庫ID'])?t['在庫ID']:null;
+  pendingStockPhoto=null;
+  const sh=document.getElementById('fSheetIn'); if(!sh) return;
+  sh.innerHTML=stockFormHtml(t||{});
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  document.getElementById('fSheet').scrollTop=0;
+  const pi=document.getElementById('s_photo');
+  if(pi) pi.onchange=async function(e){ const f=e.target.files&&e.target.files[0]; if(!f) return;
+    const d=await resizeImage(f,1280); if(!d){ toast('画像を読み込めませんでした'); return; }
+    pendingStockPhoto={name:(f.name||('stock'+Date.now()+'.jpg')),dataUrl:d,mime:'image/jpeg'};
+    const pv=document.getElementById('stockPrev'); if(pv){ pv.style.backgroundImage='url('+d+')'; pv.textContent=''; } };
+  const sv=document.getElementById('s_save'); if(sv) sv.onclick=saveStock;
+  const dl=document.getElementById('s_del'); if(dl) dl.onclick=()=>deleteStock(editingStockId);
+}
+function openStockDetail(id){ const t=stockList.find(x=>String(x['在庫ID'])===id); if(t) openStockForm(t); }
+async function saveStock(){
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const v=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+  const name=v('s_name'); if(!name){ toast('農薬名を入力してください'); return; }
+  const rec={農薬名:name, カテゴリ:v('s_cat'), メーカー:v('s_maker'), 登録番号:v('s_regno'),
+    在庫量:v('s_qty'), 単位:v('s_unit'), 保管倉庫:v('s_wh'), 購入日:v('s_buy'), 使用期限:v('s_exp'),
+    備考:v('s_memo'), 記録者:RECORDER};
+  const btn=document.getElementById('s_save'); if(guardBtn(btn)===false) return;
+  try{
+    let sid=editingStockId;
+    if(editingStockId){
+      await fetch(CONFIG.GAS_URL+'?action=updateStock&'+new URLSearchParams(Object.assign({id:editingStockId},rec)));
+    }else{
+      const j=await (await fetch(CONFIG.GAS_URL+'?action=addStock&'+new URLSearchParams(rec))).json();
+      sid=(j&&j.id)?j.id:null;
+    }
+    if(pendingStockPhoto && sid){
+      try{ await fetch(CONFIG.GAS_URL,{method:'POST',body:JSON.stringify({action:'uploadPhoto',記録ID:sid,種別:'農薬在庫',
+        ファイル名:pendingStockPhoto.name,mimeType:pendingStockPhoto.mime,dataB64:pendingStockPhoto.dataUrl})}); }catch(e){}
+    }
+    toast('保存しました');
+    closeFieldSheet();
+    await loadStockData(); renderStockFilter(); renderStockList();
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
+async function deleteStock(id){
+  if(!id) return;
+  if(!confirm('この在庫を削除します。よろしいですか？\n（この操作は取り消せません）')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=deleteStock&'+new URLSearchParams({id:id}))).json();
+    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadStockData(); renderStockFilter(); renderStockList(); }
+    else toast('削除に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
+}
 /* ============== 農機具 ============== */
 const TOOL_KINDS=['トラクター','管理機','耕運機','田植機','コンバイン','刈払機','草刈機','噴霧器・防除機','運搬車・軽トラ','ポンプ','その他'];
 const TOOL_WAREHOUSES=['ねぎぼうず倉庫','飯盛倉庫','貝塚倉庫','ファーム倉庫'];
@@ -1984,6 +2131,9 @@ document.getElementById('radarPrev').onclick=()=>{ radarStop(); showRadarFrame(r
 document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(radarPos+1); };
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('openTools').onclick=openTools;
+document.getElementById('openStock').onclick=openStock;
+document.getElementById('stockCloseBtn').onclick=()=>document.getElementById('stockView').classList.remove('show');
+document.getElementById('stockAddBtn').onclick=()=>openStockForm(null);
 document.getElementById('toolCloseBtn').onclick=()=>document.getElementById('toolView').classList.remove('show');
 document.getElementById('toolAddBtn').onclick=()=>openToolForm(null);
 document.getElementById('whCloseBtn').onclick=()=>document.getElementById('workHistView').classList.remove('show');
