@@ -1382,13 +1382,19 @@ let radarOn=false, radarLayer=null, radarHost=null, radarFrames=null, baseLayer=
 const ESRI_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const OSM_URL='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
 function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
+/* 背景タイルをレイヤーごと作り直す（古いタイルを残さない） */
+function setBase(url){
+  if(baseLayer){ try{ mapObj.removeLayer(baseLayer); }catch(e){} baseLayer=null; }
+  baseLayer=L.tileLayer(url,{maxZoom:19, attribution:'衛星写真 © Esri, Maxar ／ 地図 © OpenStreetMap'}).addTo(mapObj);
+  baseLayer.bringToBack();
+}
 async function toggleRadar(force){
   radarOn=(force!=null)?force:!radarOn;
   const btn=document.getElementById('radarBtn');
   if(radarOn){
     if(btn) btn.classList.add('on');
-    // 背景を通常地図に切り替え（同じレイヤーのURLを差し替え＝古いタイルが残らない）
-    if(baseLayer) baseLayer.setUrl(OSM_URL);
+    // 背景を通常地図に切り替え（レイヤーを作り直し＝古いタイルが残らない）
+    setBase(OSM_URL);
     try{
       if(!radarFrames){
         const j=await (await fetch('https://api.rainviewer.com/public/weather-maps.json')).json();
@@ -1411,7 +1417,7 @@ async function toggleRadar(force){
     if(btn) btn.classList.remove('on');
     if(radarLayer){ mapObj.removeLayer(radarLayer); radarLayer=null; }
     setRadarTime('');
-    if(baseLayer) baseLayer.setUrl(ESRI_URL); // 衛星写真に戻す
+    if(baseLayer) setBase(ESRI_URL); // 衛星写真に戻す
     try{ reloadMapFit(); }catch(e){}
   }
 }
