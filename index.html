@@ -270,10 +270,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #whBody{padding:8px 10px 40px}
 #toolView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #toolView.show{display:flex}
-#toolBody{padding:10px 12px 40px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start;overflow:auto}
-.tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column}
-.tcard .timg{width:100%;height:120px;flex:0 0 120px;background:#eef1ea center/cover no-repeat;display:flex;align-items:center;justify-content:center}
-.tcard .timg .ph{color:#aeb8aa;font-size:28px}
+#toolBody{padding:10px 12px 40px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start;align-items:start;overflow:auto}
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
+.tcard img.timg{width:100%;height:120px;object-fit:cover;display:block}
+.tcard .timg.ph{width:100%;height:120px;background:#eef1ea;display:flex;align-items:center;justify-content:center;color:#aeb8aa;font-size:28px}
 .tcard .tin{padding:8px 10px}
 .tcard .tnm{font-size:14px;font-weight:800;color:var(--stem-dk);line-height:1.25}
 .tcard .tmeta{font-size:11.5px;color:var(--sub);margin-top:3px}
@@ -1895,7 +1895,7 @@ function renderToolList(){
   box.innerHTML=list.map(function(t){
     const id=esc(t['農機具ID']||'');
     const img=toolPhotoMap[t['農機具ID']]||'';
-    const imgHtml=img?('<div class="timg" style="background-image:url('+img+')"></div>'):'<div class="timg"><span class="ph">🚜</span></div>';
+    const imgHtml=img?('<img class="timg" src="'+img+'" alt="" loading="lazy">'):'<div class="timg ph">🚜</div>';
     const meta=[t['メーカー'],t['型番']].filter(function(x){return x;}).map(esc).join(' ');
     const st=esc(t['状態']||'保管中');
     return '<div class="tcard" onclick="openToolDetail(\''+id+'\')">'+imgHtml+
