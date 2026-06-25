@@ -245,6 +245,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #plantView.show{display:flex}
 #guideView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #guideView.show{display:flex}
+#workHistView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#workHistView.show{display:flex}
+#whBody{padding:8px 10px 40px}
 .gdcrops{display:flex;flex-wrap:wrap;gap:8px;padding:12px;flex:0 0 auto;max-height:34vh;overflow:auto;border-bottom:1px solid var(--line)}
 .gdchip{appearance:none;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:8px 15px;font-size:13.5px;font-weight:700;color:var(--stem-dk);cursor:pointer}
 .gdchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
@@ -461,6 +464,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span>作業報告・予定</span>
       </button>
+      <button class="tile" id="openWorkHist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l4 2"/></svg>
+        <span>作業履歴</span>
+      </button>
       <button class="tile soon" onclick="toast('この機能は準備中です。順次追加します')">
         <span class="badge">準備中</span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17V8h7l3 4h2v5"/></svg>
@@ -585,6 +592,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 <div id="gdScrim"></div>
 <div id="gdSheet"><div class="grab"></div><div class="sheet-in" id="gdSheetIn"></div></div>
+
+<div id="workHistView">
+  <div class="calhead">
+    <h2>作業履歴</h2>
+    <button class="maddbtn" id="whAddBtn">＋ 作業を記録</button>
+    <button class="mclose" id="whCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">過去の作業記録です。各行から修正・削除ができます。</span></div>
+  <div id="whBody" class="calbody"></div>
+</div>
 
 <div id="rScrim"></div>
 <div id="rSheet"><div class="grab"></div><div class="sheet-in" id="rSheetIn"></div></div>
@@ -1453,17 +1470,29 @@ async function openWorkForm(){
   workCat=null;
   editingWorkId=null; editingWorkRec=null; editPrefillPending=false;
   pendingWorkPhotos=[]; weedRange='全部';
-  await loadWorkHistoryData();
+  await loadWorkHistoryData(15);
   renderWorkForm();
   document.getElementById('fScrim').classList.add('show');
   document.getElementById('fSheet').classList.add('show');
 }
-let workHistory=[];
-async function loadWorkHistoryData(){
+let workHistory=[], histLimit=15;
+async function loadWorkHistoryData(limit){
+  histLimit=limit||histLimit||15;
   workHistory=[];
   if(!CONFIG.GAS_URL) return;
-  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWork&limit=15')).json();
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWork&limit='+histLimit)).json();
     workHistory=(j&&j.records)?j.records:[]; }catch(e){ workHistory=[]; }
+}
+function refreshWorkHistoryUI(){
+  const w=document.getElementById('wHistWrap'); if(w) w.innerHTML=workHistoryHtml();
+  const b=document.getElementById('whBody'); if(b) b.innerHTML=workHistoryHtml();
+}
+async function openWorkHist(){
+  document.getElementById('workHistView').classList.add('show');
+  if(!fieldList.length) await loadFields();
+  document.getElementById('whBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
+  await loadWorkHistoryData(50);
+  document.getElementById('whBody').innerHTML=workHistoryHtml();
 }
 function workHistoryHtml(){
   if(!workHistory.length) return '<div class="note">まだ作業記録はありません。</div>';
@@ -1488,7 +1517,7 @@ async function delWork(id){
     if(j&&j.ok){
       toast('削除しました');
       await loadWorkHistoryData();
-      const w=document.getElementById('wHistWrap'); if(w) w.innerHTML=workHistoryHtml();
+      refreshWorkHistoryUI();
       if(typeof mapReady!=='undefined' && mapReady && typeof loadFieldStatus==='function') loadFieldStatus();
     }else toast('削除に失敗しました：'+esc((j&&j.error)||''));
   }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
@@ -1526,7 +1555,7 @@ function renderWorkForm(){
       '<button class="save" id="w_save">'+(editingWorkId?'この内容で上書き保存':'この内容で記録する')+'</button>'+
       (editingWorkId?'':'<button class="save" id="w_plan" style="background:#fff;color:#1b5e20;border:1px solid #2e7d32;margin-top:8px">予定に追加（あとで実績化）</button>')+
       '<div class="note">この記録は圃場マップのポップアップ「直近の作業」にも表示されます。カテゴリーが<b>除草</b>の場合、除草済み／未処理の判定にも反映されます。</div>'+
-      '<div class="eyebrow" style="margin-top:16px">最近の作業記録</div>'+
+      '<div class="eyebrow" style="margin-top:16px">最近の作業記録（直近15件・全件はメニューの「作業履歴」）</div>'+
       '<div id="wHistWrap">'+workHistoryHtml()+'</div>'+
     '</div>';
   document.querySelectorAll('.catbtn').forEach(b=>b.onclick=()=>{ if(b.classList.contains('rng')) return; workCat=b.dataset.cat; renderWorkForm(); });
@@ -1553,6 +1582,8 @@ function editWork(id){
   editingWorkId=id; editingWorkRec=r; editPrefillPending=true;
   workCat=r['カテゴリ']||null; pendingWorkPhotos=[]; weedRange=(r['範囲']==='一部')?'一部':'全部';
   renderWorkForm();
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
   const sh=document.getElementById('fSheet'); if(sh) sh.scrollTop=0;
 }
 function cancelEditWork(){
@@ -1615,7 +1646,9 @@ function saveWork(){
       if(j&&j.ok){
         toast('作業記録を修正しました');
         editingWorkId=null; editingWorkRec=null; workCat=null;
-        await loadWorkHistoryData(); renderWorkForm();
+        await loadWorkHistoryData();
+        closeFieldSheet();
+        refreshWorkHistoryUI();
         if(mapReady) await loadFieldStatus();
       }else toast('修正に失敗しました');
     }).catch(()=>toast('修正に失敗しました。通信を確認してください'))
@@ -1631,6 +1664,7 @@ function saveWork(){
       if(n>0){ toast('作業を記録しました。写真'+n+'枚を保存中…'); await uploadWorkPhotos(j.id); toast('写真'+n+'枚を保存しました'); }
       else toast('作業を記録しました');
       closeFieldSheet();
+      if(typeof workHistory!=='undefined'){ await loadWorkHistoryData(); refreshWorkHistoryUI(); }
       if(mapReady) await loadFieldStatus();
     }else toast('保存に失敗しました');
   }).catch(()=>toast('保存に失敗しました。通信を確認してください'))
@@ -1679,6 +1713,9 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+document.getElementById('openWorkHist').onclick=openWorkHist;
+document.getElementById('whCloseBtn').onclick=()=>document.getElementById('workHistView').classList.remove('show');
+document.getElementById('whAddBtn').onclick=openWorkForm;
 document.getElementById('openDiag').onclick=openDiag;
 document.getElementById('dScrim').onclick=closeDiag;
 
