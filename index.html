@@ -270,12 +270,12 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #whBody{padding:8px 10px 40px}
 #toolView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #toolView.show{display:flex}
-#toolBody{padding:10px 12px 40px;display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start;align-items:start;overflow:auto}
-.tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer}
-.tcard .timgwrap{width:100%;height:120px;background:#eef1ea;overflow:hidden;display:flex;align-items:center;justify-content:center}
-.tcard .timgwrap img{width:100%;height:100%;object-fit:cover;display:block}
-.tcard .timgwrap .ph{color:#aeb8aa;font-size:28px}
-.tcard .tin{padding:8px 10px}
+#toolBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:stretch}
+.tcard .timgwrap{width:116px;height:92px;flex:0 0 116px;background:#eef1ea;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.tcard .timgwrap img{width:116px;height:92px;object-fit:cover;display:block}
+.tcard .timgwrap .ph{color:#aeb8aa;font-size:26px}
+.tcard .tin{flex:1;min-width:0;padding:9px 11px}
 .tcard .tnm{font-size:14px;font-weight:800;color:var(--stem-dk);line-height:1.25}
 .tcard .tmeta{font-size:11.5px;color:var(--sub);margin-top:3px}
 .tcard .twh{display:inline-block;margin-top:6px;margin-right:5px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF3EA;color:var(--stem-dk)}
@@ -1892,11 +1892,11 @@ function renderToolList(){
   const box=document.getElementById('toolBody'); if(!box) return;
   let list=toolList;
   if(toolWh!=='すべて') list=toolList.filter(t=>String(t['保管倉庫']||'その他')===toolWh);
-  if(!list.length){ box.innerHTML='<div class="note" style="grid-column:1/-1;padding:16px">'+(toolList.length?'この倉庫の農機具はありません。':'まだ農機具の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
+  if(!list.length){ box.innerHTML='<div class="note" style="padding:16px">'+(toolList.length?'この倉庫の農機具はありません。':'まだ農機具の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
   box.innerHTML=list.map(function(t){
     const id=esc(t['農機具ID']||'');
     const img=toolPhotoMap[t['農機具ID']]||'';
-    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="">'):'<span class="ph">🚜</span>')+'</div>';
+    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="" width="116" height="92">'):'<span class="ph">🚜</span>')+'</div>';
     const meta=[t['メーカー'],t['型番']].filter(function(x){return x;}).map(esc).join(' ');
     const st=esc(t['状態']||'保管中');
     return '<div class="tcard" onclick="openToolDetail(\''+id+'\')">'+imgHtml+
