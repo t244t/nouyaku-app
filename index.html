@@ -2050,21 +2050,22 @@ async function loadTyphoon(){
       html+='<div class="typnone">🌀 現在、発生中の<br>台風はありません</div>';
     }else{
       html+=j.typhoons.map(function(t){
-        const ttl=(t.number?('台風'+esc(t.number)+'号'):'台風')+(t.name?('（'+esc(t.name)+'）'):'');
+        const ttl=t.title?esc(t.title):((t.number?('台風'+esc(t.number)+'号'):'台風'));
         const rows=[];
         if(t.area) rows.push('<div class="tyrow"><b>現在位置：</b>'+esc(t.area)+'</div>');
         if(t.intensity) rows.push('<div class="tyrow"><b>強さ：</b>'+esc(t.intensity)+'</div>');
         if(t.pressure) rows.push('<div class="tyrow"><b>中心気圧：</b>'+esc(String(t.pressure))+' hPa</div>');
-        if(t.maxWind) rows.push('<div class="tyrow"><b>最大風速：</b>'+esc(String(t.maxWind))+' m/s</div>');
-        if(t.direction) rows.push('<div class="tyrow"><b>進行方向：</b>'+esc(t.direction)+'</div>');
-        if(!rows.length) rows.push('<div class="tyrow">詳しい情報は気象庁の台風情報をご確認ください。</div>');
-        return '<div class="typcard"><div class="tytitle">🌀 '+ttl+'</div>'+rows.join('')+'</div>';
+        if(t.maxWind) rows.push('<div class="tyrow"><b>最大風速：</b>'+esc(String(t.maxWind))+'</div>');
+        if(t.direction) rows.push('<div class="tyrow"><b>進行方向：</b>'+esc(t.direction)+(t.speed?('（'+esc(String(t.speed))+'）'):'')+'</div>');
+        if(t.report){ const rd=new Date(t.report); if(!isNaN(rd)) rows.push('<div class="tyrow"><b>発表：</b>'+(rd.getMonth()+1)+'月'+rd.getDate()+'日 '+('0'+rd.getHours()).slice(-2)+':'+('0'+rd.getMinutes()).slice(-2)+'</div>'); }
+        return '<div class="typcard"><div class="tytitle">🌀 '+ttl+'</div>'+rows.join('')+
+          (t.specSample?('<div style="margin-top:8px;font-size:10px;color:#bbb;word-break:break-all"><b>詳細診断:</b><br>'+esc(t.specSample)+'</div>'):'')+
+          '</div>';
       }).join('');
       html+='<div class="warntime" style="margin-top:4px">台風が接近する場合は、収穫の前倒しや資材の固定・退避など、早めの備えを。</div>';
     }
     const now=new Date();
     html+='<div class="warntime">アプリ確認：'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+'　／　出典：気象庁</div>';
-    if(j.rawSample){ html+='<div style="margin-top:14px;font-size:10px;color:#999;line-height:1.5;word-break:break-all"><b>診断（件数'+esc(String(j.rawCount||0))+'）:</b><br>'+esc(j.rawSample)+'</div>'; }
     box.innerHTML=html;
   }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
 }
