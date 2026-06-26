@@ -2064,6 +2064,7 @@ async function loadTyphoon(){
     }
     const now=new Date();
     html+='<div class="warntime">アプリ確認：'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+'　／　出典：気象庁</div>';
+    if(j.rawSample){ html+='<div style="margin-top:14px;font-size:10px;color:#999;line-height:1.5;word-break:break-all"><b>診断（件数'+esc(String(j.rawCount||0))+'）:</b><br>'+esc(j.rawSample)+'</div>'; }
     box.innerHTML=html;
   }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
 }
