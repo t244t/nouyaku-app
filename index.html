@@ -276,6 +276,18 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #fertView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #fertView.show{display:flex}
 #fertBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+#warnView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#warnView.show{display:flex}
+.warncard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-left-width:6px;border-radius:12px;padding:13px 15px;box-shadow:var(--shadow);margin-bottom:10px}
+.warncard .wi{font-size:22px}
+.warncard .wn{font-size:16px;font-weight:800;color:var(--ink)}
+.warncard .ws{font-size:11.5px;color:var(--soft);font-weight:700;margin-top:2px}
+.warncard.lv-special{border-left-color:#c0143c;background:#fdeef1}
+.warncard.lv-warn{border-left-color:#e06b00;background:#fdf2e6}
+.warncard.lv-advis{border-left-color:#E6A700;background:#fbf6e3}
+.warnnone{text-align:center;color:var(--stem-dk);font-weight:800;font-size:15px;padding:26px 14px;background:#eaf3ea;border:1px solid #cfe3d2;border-radius:14px}
+.warnhead{font-size:13px;color:var(--sub);line-height:1.6;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.warntime{font-size:11.5px;color:var(--soft);margin-top:10px;text-align:center}
 #diluteView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #diluteView.show{display:flex}
 #advisorView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
@@ -569,6 +581,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 16a4 4 0 1 1 1-7.9A5 5 0 0 1 18 9a3.5 3.5 0 0 1 0 7"/><path d="M8 19l-1 2M12 19l-1 2M16 19l-1 2"/></svg>
         <span>雨雲レーダー</span>
       </button>
+      <button class="tile" id="openWarn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h0"/></svg>
+        <span>警報・注意報</span>
+      </button>
     </div>
   </div>
 
@@ -719,6 +735,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <div class="dilresult" id="dilResult"></div>
     <div class="dilnote">「農薬の量」は、薬液の量 ÷ 倍率で計算しています。液剤はmL、粒剤・水和剤などはgとして読み替えてください（重さと体積は1mL≒1gで概算）。正確な使用量・希釈は、必ず農薬のラベルに従ってください。</div>
   </div>
+</div>
+
+<div id="warnView">
+  <div class="calhead">
+    <h2>警報・注意報</h2>
+    <button class="maddbtn" id="warnReload">更新</button>
+    <button class="mclose" id="warnCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">気象庁が糸島市（福岡地方）に発表中の警報・注意報です。</span></div>
+  <div id="warnBody" class="calbody" style="padding:14px 14px 40px;overflow:auto"></div>
 </div>
 
 <div id="fertView">
@@ -1962,6 +1988,42 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+/* ============== 気象警報・注意報 ============== */
+function warnLevel(name){
+  if(name.indexOf('特別警報')>=0) return {cls:'lv-special',icon:'🟥',label:'特別警報'};
+  if(name.indexOf('警報')>=0) return {cls:'lv-warn',icon:'🟧',label:'警報'};
+  return {cls:'lv-advis',icon:'🟨',label:'注意報'};
+}
+async function openWarn(){
+  document.getElementById('warnView').classList.add('show');
+  loadWarn();
+}
+async function loadWarn(){
+  const box=document.getElementById('warnBody'); if(!box) return;
+  box.innerHTML='<div class="note" style="padding:16px">気象庁の情報を確認中…</div>';
+  if(!CONFIG.GAS_URL){ box.innerHTML='<div class="note" style="padding:16px">GAS未接続です</div>'; return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=jmaWarning')).json();
+    if(!j||!j.ok){ box.innerHTML='<div class="note" style="padding:16px">気象庁の情報を取得できませんでした。'+esc((j&&j.error)||'')+'</div>'; return; }
+    let html='';
+    if(j.headline) html+='<div class="warnhead">'+esc(j.headline)+'</div>';
+    if(!j.warnings||!j.warnings.length){
+      html+='<div class="warnnone">✅ 現在、発表中の<br>警報・注意報はありません</div>';
+    }else{
+      // 重い順（特別警報→警報→注意報）に並べる
+      const order=w=>{ const n=w.name; return n.indexOf('特別警報')>=0?0:(n.indexOf('警報')>=0?1:2); };
+      const sorted=j.warnings.slice().sort((a,b)=>order(a)-order(b));
+      html+=sorted.map(function(w){
+        const lv=warnLevel(w.name);
+        return '<div class="warncard '+lv.cls+'"><span class="wi">'+lv.icon+'</span>'+
+          '<div><div class="wn">'+esc(w.name)+'</div><div class="ws">'+lv.label+'　'+esc(w.status||'発表中')+'</div></div></div>';
+      }).join('');
+    }
+    if(j.report){ const d=new Date(j.report); if(!isNaN(d)) html+='<div class="warntime">気象庁発表：'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+' 時点</div>'; }
+    html+='<div class="warntime">出典：気象庁</div>';
+    box.innerHTML=html;
+  }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
+}
 /* ============== 肥料在庫 ============== */
 const FERT_KINDS=['化成肥料','有機肥料','単肥','石灰・苦土','液肥','その他'];
 const FERT_UNITS=['袋','本','缶','箱','kg','g','L','mL'];
@@ -2442,6 +2504,9 @@ document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(r
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('openTools').onclick=openTools;
 document.getElementById('openFert').onclick=openFert;
+document.getElementById('openWarn').onclick=openWarn;
+document.getElementById('warnCloseBtn').onclick=()=>document.getElementById('warnView').classList.remove('show');
+document.getElementById('warnReload').onclick=loadWarn;
 document.getElementById('fertCloseBtn').onclick=()=>document.getElementById('fertView').classList.remove('show');
 document.getElementById('fertAddBtn').onclick=()=>openFertForm(null);
 document.getElementById('openStock').onclick=openStock;
