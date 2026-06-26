@@ -743,7 +743,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <button class="maddbtn" id="warnReload">更新</button>
     <button class="mclose" id="warnCloseBtn">閉じる</button>
   </div>
-  <div class="callegend"><span style="color:var(--soft)">気象庁が糸島市（福岡地方）に発表中の警報・注意報です。</span></div>
+  <div class="callegend"><span style="color:var(--soft)">気象庁が福岡県内に発表中の警報・注意報です。</span></div>
   <div id="warnBody" class="calbody" style="padding:14px 14px 40px;overflow:auto"></div>
 </div>
 
@@ -2016,13 +2016,12 @@ async function loadWarn(){
       html+=sorted.map(function(w){
         const lv=warnLevel(w.name);
         return '<div class="warncard '+lv.cls+'"><span class="wi">'+lv.icon+'</span>'+
-          '<div><div class="wn">'+esc(w.name)+'</div><div class="ws">'+lv.label+'　'+esc(w.status||'発表中')+'</div></div></div>';
+          '<div><div class="wn">'+esc(w.name)+'</div><div class="ws">'+lv.label+'　福岡県内で発表中</div></div></div>';
       }).join('');
     }
     if(j.report){ const d=new Date(j.report); if(!isNaN(d)) html+='<div class="warntime">気象庁の最終更新：'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+'</div>'; }
     const now=new Date();
     html+='<div class="warntime">アプリ確認：'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+'　／　出典：気象庁</div>';
-    if(j.debug){ html+='<div style="margin-top:14px;font-size:10px;color:#999;line-height:1.5;word-break:break-all"><b>診断['+esc(j.fmt||'')+']:</b> 糸島='+esc(j.cityCode||'?')+' 地方='+esc(j.regionCode||'?')+' 一致='+(j.matched?'有':'無')+'<br>'+j.debug.map(esc).join('<br>')+'</div>'; }
     box.innerHTML=html;
   }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
 }
