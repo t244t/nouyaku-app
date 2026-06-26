@@ -278,6 +278,12 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #fertBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #warnView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #warnView.show{display:flex}
+.whphotos{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.whphotos img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
+#photoView{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:20px}
+#photoView.show{display:flex}
+#photoView img{max-width:100%;max-height:100%;border-radius:10px}
+#photoView .pvclose{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;width:42px;height:42px;border:0;border-radius:50%;background:rgba(255,255,255,.92);font-size:20px;font-weight:800;cursor:pointer}
 .warncard{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-left-width:6px;border-radius:12px;padding:13px 15px;box-shadow:var(--shadow);margin-bottom:10px}
 .warncard .wi{font-size:22px}
 .warncard .wn{font-size:16px;font-weight:800;color:var(--ink)}
@@ -746,6 +752,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div class="callegend"><span style="color:var(--soft)">気象庁が福岡県内に発表中の警報・注意報です。</span></div>
   <div id="warnBody" class="calbody" style="padding:14px 14px 40px;overflow:auto"></div>
 </div>
+
+<div id="photoView"><button class="pvclose" id="pvClose">✕</button><img id="pvImg" src="" alt=""></div>
 
 <div id="fertView">
   <div class="calhead">
@@ -1749,13 +1757,17 @@ async function openWorkForm(){
   document.getElementById('fScrim').classList.add('show');
   document.getElementById('fSheet').classList.add('show');
 }
-let workHistory=[], histLimit=15;
+let workHistory=[], histLimit=15, workPhotoMap={};
 async function loadWorkHistoryData(limit){
   histLimit=limit||histLimit||15;
-  workHistory=[];
+  workHistory=[]; workPhotoMap={};
   if(!CONFIG.GAS_URL) return;
   try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWork&limit='+histLimit)).json();
     workHistory=(j&&j.records)?j.records:[]; }catch(e){ workHistory=[]; }
+  try{ const j2=await (await fetch(CONFIG.GAS_URL+'?action=listPhotos')).json();
+    const ph=(j2&&j2.photos)?j2.photos:[];
+    ph.forEach(function(r){ if(String(r['種別'])==='作業'){ const k=String(r['記録ID']); if(!workPhotoMap[k]) workPhotoMap[k]=[]; workPhotoMap[k].push(driveImg(r['URL'])); } });
+  }catch(e){}
 }
 function refreshWorkHistoryUI(){
   const w=document.getElementById('wHistWrap'); if(w) w.innerHTML=workHistoryHtml();
@@ -1774,9 +1786,11 @@ function workHistoryHtml(){
     const d=String(r['作業日']||'').slice(0,10);
     const sub=[r['圃場'], r['時間'], r['記録者']?('記録者:'+r['記録者']):'', r['メモ']].filter(function(x){return x;}).map(esc).join(' / ');
     const id=esc(r['作業ID']||'');
+    const imgs=(workPhotoMap[r['作業ID']]||[]);
+    const photoHtml=imgs.length?('<div class="whphotos">'+imgs.map(function(u){ return '<img src="'+u+'" alt="作業写真" onclick="openPhotoView(\''+u+'\')">'; }).join('')+'</div>'):'';
     return '<div class="whrow"><div class="whd">'+esc(d)+'</div>'+
       '<div class="whmain"><b>'+esc(r['カテゴリ']||'')+'</b> '+esc(r['作業内容']||'')+
-      (sub?'<div class="whsub">'+sub+'</div>':'')+'</div>'+
+      (sub?'<div class="whsub">'+sub+'</div>':'')+photoHtml+'</div>'+
       (id?'<div class="whbtns"><button class="whedit" onclick="editWork(\''+id+'\')">修正</button>'+
           '<button class="whdel" onclick="delWork(\''+id+'\')">削除</button></div>':'')+
       '</div>';
@@ -1988,7 +2002,16 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
-/* ============== 気象警報・注意報 ============== */
+/* ============== 作業写真の拡大表示 ============== */
+function openPhotoView(url){
+  const v=document.getElementById('photoView'); const im=document.getElementById('pvImg');
+  if(!v||!im) return; im.src=url; v.classList.add('show');
+}
+(function(){
+  const v=document.getElementById('photoView'); const c=document.getElementById('pvClose');
+  if(c) c.onclick=()=>v.classList.remove('show');
+  if(v) v.onclick=(e)=>{ if(e.target===v) v.classList.remove('show'); };
+})();
 function warnLevel(name){
   if(name.indexOf('特別警報')>=0) return {cls:'lv-special',icon:'🟥',label:'特別警報'};
   if(name.indexOf('警報')>=0) return {cls:'lv-warn',icon:'🟧',label:'警報'};
