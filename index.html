@@ -278,6 +278,13 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #fertBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #warnView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #warnView.show{display:flex}
+#typhoonView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#typhoonView.show{display:flex}
+.typcard{background:var(--card);border:1px solid var(--line);border-left:6px solid #c0143c;border-radius:14px;padding:14px 16px;box-shadow:var(--shadow);margin-bottom:12px}
+.typcard .tytitle{font-size:18px;font-weight:900;color:#c0143c}
+.typcard .tyrow{font-size:13.5px;color:var(--ink);margin-top:7px;line-height:1.5}
+.typcard .tyrow b{color:var(--stem-dk)}
+.typnone{text-align:center;color:var(--stem-dk);font-weight:800;font-size:15px;padding:26px 14px;background:#eaf3ea;border:1px solid #cfe3d2;border-radius:14px}
 .whphotos{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .whphotos img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
 #photoView{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:20px}
@@ -591,6 +598,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 2 20h20L12 3z"/><path d="M12 10v4M12 17h0"/></svg>
         <span>警報・注意報</span>
       </button>
+      <button class="tile" id="openTyphoon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 12a4 4 0 1 0-3.5 3.95C11 16 13 14 14 11c.8-2.4-.5-5-3-5.5C8 5 5 7 4.5 10"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
+        <span>台風情報</span>
+      </button>
     </div>
   </div>
 
@@ -751,6 +762,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   </div>
   <div class="callegend"><span style="color:var(--soft)">気象庁が福岡県内に発表中の警報・注意報です。</span></div>
   <div id="warnBody" class="calbody" style="padding:14px 14px 40px;overflow:auto"></div>
+</div>
+
+<div id="typhoonView">
+  <div class="calhead">
+    <h2>台風情報</h2>
+    <button class="maddbtn" id="typhoonReload">更新</button>
+    <button class="mclose" id="typhoonCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">気象庁が発表中の台風の情報です。</span></div>
+  <div id="typhoonBody" class="calbody" style="padding:14px 14px 40px;overflow:auto"></div>
 </div>
 
 <div id="photoView"><button class="pvclose" id="pvClose">✕</button><img id="pvImg" src="" alt=""></div>
@@ -2012,6 +2033,40 @@ function openPhotoView(url){
   if(c) c.onclick=()=>v.classList.remove('show');
   if(v) v.onclick=(e)=>{ if(e.target===v) v.classList.remove('show'); };
 })();
+/* ============== 台風情報 ============== */
+async function openTyphoon(){
+  document.getElementById('typhoonView').classList.add('show');
+  loadTyphoon();
+}
+async function loadTyphoon(){
+  const box=document.getElementById('typhoonBody'); if(!box) return;
+  box.innerHTML='<div class="note" style="padding:16px">気象庁の情報を確認中…</div>';
+  if(!CONFIG.GAS_URL){ box.innerHTML='<div class="note" style="padding:16px">GAS未接続です</div>'; return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=jmaTyphoon')).json();
+    if(!j||!j.ok){ box.innerHTML='<div class="note" style="padding:16px">台風情報を取得できませんでした。'+esc((j&&j.error)||'')+'</div>'; return; }
+    let html='';
+    if(!j.typhoons||!j.typhoons.length){
+      html+='<div class="typnone">🌀 現在、発生中の<br>台風はありません</div>';
+    }else{
+      html+=j.typhoons.map(function(t){
+        const ttl=(t.number?('台風'+esc(t.number)+'号'):'台風')+(t.name?('（'+esc(t.name)+'）'):'');
+        const rows=[];
+        if(t.area) rows.push('<div class="tyrow"><b>現在位置：</b>'+esc(t.area)+'</div>');
+        if(t.intensity) rows.push('<div class="tyrow"><b>強さ：</b>'+esc(t.intensity)+'</div>');
+        if(t.pressure) rows.push('<div class="tyrow"><b>中心気圧：</b>'+esc(String(t.pressure))+' hPa</div>');
+        if(t.maxWind) rows.push('<div class="tyrow"><b>最大風速：</b>'+esc(String(t.maxWind))+' m/s</div>');
+        if(t.direction) rows.push('<div class="tyrow"><b>進行方向：</b>'+esc(t.direction)+'</div>');
+        if(!rows.length) rows.push('<div class="tyrow">詳しい情報は気象庁の台風情報をご確認ください。</div>');
+        return '<div class="typcard"><div class="tytitle">🌀 '+ttl+'</div>'+rows.join('')+'</div>';
+      }).join('');
+      html+='<div class="warntime" style="margin-top:4px">台風が接近する場合は、収穫の前倒しや資材の固定・退避など、早めの備えを。</div>';
+    }
+    const now=new Date();
+    html+='<div class="warntime">アプリ確認：'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+'　／　出典：気象庁</div>';
+    box.innerHTML=html;
+  }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
+}
 function warnLevel(name){
   if(name.indexOf('特別警報')>=0) return {cls:'lv-special',icon:'🟥',label:'特別警報'};
   if(name.indexOf('警報')>=0) return {cls:'lv-warn',icon:'🟧',label:'警報'};
@@ -2531,6 +2586,9 @@ document.getElementById('openFert').onclick=openFert;
 document.getElementById('openWarn').onclick=openWarn;
 document.getElementById('warnCloseBtn').onclick=()=>document.getElementById('warnView').classList.remove('show');
 document.getElementById('warnReload').onclick=loadWarn;
+document.getElementById('openTyphoon').onclick=openTyphoon;
+document.getElementById('typhoonCloseBtn').onclick=()=>document.getElementById('typhoonView').classList.remove('show');
+document.getElementById('typhoonReload').onclick=loadTyphoon;
 document.getElementById('fertCloseBtn').onclick=()=>document.getElementById('fertView').classList.remove('show');
 document.getElementById('fertAddBtn').onclick=()=>openFertForm(null);
 document.getElementById('openStock').onclick=openStock;
