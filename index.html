@@ -273,6 +273,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #stockView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #stockView.show{display:flex}
 #stockBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+#fertView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#fertView.show{display:flex}
+#fertBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #diluteView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #diluteView.show{display:flex}
 #advisorView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
@@ -554,6 +557,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/><path d="M5 17V8h7l3 4h2v5"/></svg>
         <span>農機具</span>
       </button>
+      <button class="tile" id="openFert">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h0M15 11h0"/></svg>
+        <span>肥料在庫</span>
+      </button>
     </div>
 
     <div class="eyebrow">天気</div>
@@ -712,6 +719,17 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <div class="dilresult" id="dilResult"></div>
     <div class="dilnote">「農薬の量」は、薬液の量 ÷ 倍率で計算しています。液剤はmL、粒剤・水和剤などはgとして読み替えてください（重さと体積は1mL≒1gで概算）。正確な使用量・希釈は、必ず農薬のラベルに従ってください。</div>
   </div>
+</div>
+
+<div id="fertView">
+  <div class="calhead">
+    <h2>肥料在庫</h2>
+    <button class="maddbtn" id="fertAddBtn">＋ 追加</button>
+    <button class="mclose" id="fertCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">肥料の在庫一覧です。タップで詳細・編集ができます。</span></div>
+  <div id="fertFilter" class="toolfilter"></div>
+  <div id="fertBody" class="calbody"></div>
 </div>
 
 <div id="stockView">
@@ -1944,6 +1962,131 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+/* ============== 肥料在庫 ============== */
+const FERT_KINDS=['化成肥料','有機肥料','単肥','石灰・苦土','液肥','その他'];
+const FERT_UNITS=['袋','本','缶','箱','kg','g','L','mL'];
+let fertList=[], fertPhotoMap={}, editingFertId=null, pendingFertPhoto=null, fertKind='すべて';
+async function loadFertData(){
+  fertList=[]; fertPhotoMap={};
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listFert')).json(); fertList=(j&&j.fert)?j.fert:[]; }catch(e){ fertList=[]; }
+  try{ const j2=await (await fetch(CONFIG.GAS_URL+'?action=listPhotos')).json();
+    const ph=(j2&&j2.photos)?j2.photos:[];
+    ph.forEach(function(r){ if(String(r['種別'])==='肥料在庫'){ const k=String(r['記録ID']); if(!fertPhotoMap[k]) fertPhotoMap[k]=driveImg(r['URL']); } });
+  }catch(e){}
+}
+async function openFert(){
+  document.getElementById('fertView').classList.add('show');
+  document.getElementById('fertBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
+  await loadFertData();
+  renderFertFilter(); renderFertList();
+}
+function renderFertFilter(){
+  const box=document.getElementById('fertFilter'); if(!box) return;
+  const cnt={};
+  fertList.forEach(t=>{ const c=String(t['種類']||'その他'); cnt[c]=(cnt[c]||0)+1; });
+  const items=['すべて'].concat(FERT_KINDS);
+  Object.keys(cnt).forEach(c=>{ if(items.indexOf(c)<0) items.push(c); });
+  box.innerHTML=items.map(function(c){
+    const n=(c==='すべて')?fertList.length:(cnt[c]||0);
+    return '<button class="fchip'+(fertKind===c?' on':'')+'" data-c="'+esc(c)+'">'+esc(c)+'（'+n+'）</button>';
+  }).join('');
+  box.querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ fertKind=b.dataset.c; renderFertFilter(); renderFertList(); });
+}
+function renderFertList(){
+  const box=document.getElementById('fertBody'); if(!box) return;
+  let list=fertList;
+  if(fertKind!=='すべて') list=fertList.filter(t=>String(t['種類']||'その他')===fertKind);
+  if(!list.length){ box.innerHTML='<div class="note" style="padding:16px">'+(fertList.length?'この種類の肥料はありません。':'まだ肥料在庫の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
+  box.innerHTML=list.map(function(t){
+    const id=esc(t['肥料ID']||'');
+    const img=fertPhotoMap[t['肥料ID']]||'';
+    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="" width="116" height="92">'):'<span class="ph">🌱</span>')+'</div>';
+    const qty=[t['在庫量'],t['単位']].filter(function(x){return x!==''&&x!=null;}).map(esc).join(' ');
+    const seibun=t['成分']?('N-P-K '+esc(t['成分'])):'';
+    return '<div class="tcard" onclick="openFertDetail(\''+id+'\')">'+imgHtml+
+      '<div class="tin"><div class="tnm">'+esc(t['肥料名']||'(名称未設定)')+'</div>'+
+      (seibun?'<div class="tmeta">'+seibun+'</div>':'')+
+      '<div class="tmeta">在庫：'+(qty||'—')+'</div>'+
+      '<div><span class="twh">📍 '+esc(t['保管倉庫']||'—')+'</span><span class="twh" style="background:#EDF3E6;color:var(--stem-dk)">'+esc(t['種類']||'—')+'</span></div>'+
+      '</div></div>';
+  }).join('');
+}
+function fertFormHtml(t){
+  t=t||{};
+  const kindOpts=FERT_KINDS.map(c=>'<option'+(t['種類']===c?' selected':'')+'>'+esc(c)+'</option>').join('');
+  const whOpts=TOOL_WAREHOUSES.map(w=>'<option'+(t['保管倉庫']===w?' selected':'')+'>'+esc(w)+'</option>').join('')+'<option'+(t['保管倉庫']&&TOOL_WAREHOUSES.indexOf(t['保管倉庫'])<0?' selected':'')+'>その他</option>';
+  const unitOpts='<option value="">単位</option>'+FERT_UNITS.map(u=>'<option'+(t['単位']===u?' selected':'')+'>'+esc(u)+'</option>').join('');
+  const img=t['肥料ID']?(fertPhotoMap[t['肥料ID']]||''):'';
+  const prev=pendingFertPhoto?pendingFertPhoto.dataUrl:img;
+  return '<div class="fh"><div class="nm">'+(t['肥料ID']?'肥料在庫を編集':'肥料在庫を追加')+'</div></div>'+
+    '<div class="tprev" id="fertPrev"'+(prev?(' style="background-image:url('+prev+')"'):'')+'>'+(prev?'':'🌱')+'</div>'+
+    '<div class="field"><label>写真（任意）</label><input id="ft_photo" type="file" accept="image/*"></div>'+
+    '<div class="field"><label>肥料名</label><input id="ft_name" value="'+esc(t['肥料名']||'')+'" placeholder="例：野菜の化成 8-8-8"></div>'+
+    '<div class="field"><label>種類</label><select id="ft_kind">'+kindOpts+'</select></div>'+
+    '<div class="row2"><div class="field"><label>メーカー（任意）</label><input id="ft_maker" value="'+esc(t['メーカー']||'')+'" placeholder="例：JA"></div>'+
+    '<div class="field"><label>成分 N-P-K（任意）</label><input id="ft_seibun" value="'+esc(t['成分']||'')+'" placeholder="例：8-8-8"></div></div>'+
+    '<div class="row2"><div class="field"><label>在庫量</label><input id="ft_qty" value="'+esc(t['在庫量']||'')+'" inputmode="decimal" placeholder="例：5"></div>'+
+    '<div class="field"><label>単位</label><select id="ft_unit">'+unitOpts+'</select></div></div>'+
+    '<div class="row2"><div class="field"><label>保管倉庫</label><select id="ft_wh">'+whOpts+'</select></div>'+
+    '<div class="field"><label>購入日（任意）</label><input id="ft_buy" type="date" value="'+esc(t['購入日']||'')+'"></div></div>'+
+    '<div class="field"><label>備考（任意）</label><input id="ft_memo" value="'+esc(t['備考']||'')+'" placeholder="対象作物・使い方など"></div>'+
+    '<button class="save" id="ft_save">'+(t['肥料ID']?'上書き保存':'登録する')+'</button>'+
+    (t['肥料ID']?'<button class="save" id="ft_del" style="background:#fff;color:#b3261e;border:1px solid #e6b4ae;margin-top:8px">この肥料を削除</button>':'');
+}
+function openFertForm(t){
+  editingFertId=(t&&t['肥料ID'])?t['肥料ID']:null;
+  pendingFertPhoto=null;
+  const sh=document.getElementById('fSheetIn'); if(!sh) return;
+  sh.innerHTML=fertFormHtml(t||{});
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  document.getElementById('fSheet').scrollTop=0;
+  const pi=document.getElementById('ft_photo');
+  if(pi) pi.onchange=async function(e){ const f=e.target.files&&e.target.files[0]; if(!f) return;
+    const d=await resizeImage(f,1280); if(!d){ toast('画像を読み込めませんでした'); return; }
+    pendingFertPhoto={name:(f.name||('fert'+Date.now()+'.jpg')),dataUrl:d,mime:'image/jpeg'};
+    const pv=document.getElementById('fertPrev'); if(pv){ pv.style.backgroundImage='url('+d+')'; pv.textContent=''; } };
+  const sv=document.getElementById('ft_save'); if(sv) sv.onclick=saveFert;
+  const dl=document.getElementById('ft_del'); if(dl) dl.onclick=()=>deleteFert(editingFertId);
+}
+function openFertDetail(id){ const t=fertList.find(x=>String(x['肥料ID'])===id); if(t) openFertForm(t); }
+async function saveFert(){
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const v=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+  const name=v('ft_name'); if(!name){ toast('肥料名を入力してください'); return; }
+  const rec={肥料名:name, 種類:v('ft_kind'), メーカー:v('ft_maker'), 成分:v('ft_seibun'),
+    在庫量:v('ft_qty'), 単位:v('ft_unit'), 保管倉庫:v('ft_wh'), 購入日:v('ft_buy'),
+    備考:v('ft_memo'), 記録者:RECORDER};
+  const btn=document.getElementById('ft_save'); if(guardBtn(btn)===false) return;
+  try{
+    let fid=editingFertId;
+    if(editingFertId){
+      await fetch(CONFIG.GAS_URL+'?action=updateFert&'+new URLSearchParams(Object.assign({id:editingFertId},rec)));
+    }else{
+      const j=await (await fetch(CONFIG.GAS_URL+'?action=addFert&'+new URLSearchParams(rec))).json();
+      fid=(j&&j.id)?j.id:null;
+    }
+    if(pendingFertPhoto && fid){
+      try{ await fetch(CONFIG.GAS_URL,{method:'POST',body:JSON.stringify({action:'uploadPhoto',記録ID:fid,種別:'肥料在庫',
+        ファイル名:pendingFertPhoto.name,mimeType:pendingFertPhoto.mime,dataB64:pendingFertPhoto.dataUrl})}); }catch(e){}
+    }
+    toast('保存しました');
+    closeFieldSheet();
+    await loadFertData(); renderFertFilter(); renderFertList();
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
+async function deleteFert(id){
+  if(!id) return;
+  if(!confirm('この肥料を削除します。よろしいですか？\n（この操作は取り消せません）')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=deleteFert&'+new URLSearchParams({id:id}))).json();
+    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadFertData(); renderFertFilter(); renderFertList(); }
+    else toast('削除に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
+}
 /* ============== AIに相談 ============== */
 let advMsgs=[], advBusy=false;
 const ADV_SAMPLES=['今の時期のなすの追肥は？','ねぎのさび病の対策は？','梅雨前にやるべき作業は？','オクラの収穫の見極めは？'];
@@ -2298,6 +2441,9 @@ document.getElementById('radarPrev').onclick=()=>{ radarStop(); showRadarFrame(r
 document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(radarPos+1); };
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('openTools').onclick=openTools;
+document.getElementById('openFert').onclick=openFert;
+document.getElementById('fertCloseBtn').onclick=()=>document.getElementById('fertView').classList.remove('show');
+document.getElementById('fertAddBtn').onclick=()=>openFertForm(null);
 document.getElementById('openStock').onclick=openStock;
 document.getElementById('openDilute').onclick=openDilute;
 document.getElementById('openAdvisor').onclick=openAdvisor;
