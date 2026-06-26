@@ -285,6 +285,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .typcard .tyrow{font-size:13.5px;color:var(--ink);margin-top:7px;line-height:1.5}
 .typcard .tyrow b{color:var(--stem-dk)}
 .typnone{text-align:center;color:var(--stem-dk);font-weight:800;font-size:15px;padding:26px 14px;background:#eaf3ea;border:1px solid #cfe3d2;border-radius:14px}
+.jmalink{display:block;text-align:center;background:var(--stem);color:#fff;font-weight:800;font-size:15px;padding:14px;border-radius:14px;text-decoration:none;margin-bottom:14px;box-shadow:var(--shadow)}
+.jmalink:active{opacity:.85}
 .whphotos{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
 .whphotos img{width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--line);cursor:pointer}
 #photoView{position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:20px}
@@ -2046,27 +2048,23 @@ async function loadTyphoon(){
     const j=await (await fetch(CONFIG.GAS_URL+'?action=jmaTyphoon')).json();
     if(!j||!j.ok){ box.innerHTML='<div class="note" style="padding:16px">台風情報を取得できませんでした。'+esc((j&&j.error)||'')+'</div>'; return; }
     let html='';
+    html+='<a class="jmalink" href="https://www.jma.go.jp/bosai/map.html#contents=typhoon" target="_blank" rel="noopener">🌀 気象庁の台風情報を見る（地図・進路図）</a>';
     if(!j.typhoons||!j.typhoons.length){
-      html+='<div class="typnone">🌀 現在、発生中の<br>台風はありません</div>';
+      html+='<div class="typnone">🌀 現在、気象庁の台風情報に<br>掲載中の台風はありません</div>';
     }else{
       html+=j.typhoons.map(function(t){
         const ttl=t.title?esc(t.title):((t.number?('台風'+esc(t.number)+'号'):'台風'));
         const rows=[];
         if(t.area) rows.push('<div class="tyrow"><b>現在位置：</b>'+esc(t.area)+'</div>');
-        if(t.intensity) rows.push('<div class="tyrow"><b>強さ：</b>'+esc(t.intensity)+'</div>');
         if(t.pressure) rows.push('<div class="tyrow"><b>中心気圧：</b>'+esc(String(t.pressure))+' hPa</div>');
         if(t.maxWind) rows.push('<div class="tyrow"><b>最大風速：</b>'+esc(String(t.maxWind))+'</div>');
-        if(t.direction) rows.push('<div class="tyrow"><b>進行方向：</b>'+esc(t.direction)+(t.speed?('（'+esc(String(t.speed))+'）'):'')+'</div>');
         if(t.report){ const rd=new Date(t.report); if(!isNaN(rd)) rows.push('<div class="tyrow"><b>発表：</b>'+(rd.getMonth()+1)+'月'+rd.getDate()+'日 '+('0'+rd.getHours()).slice(-2)+':'+('0'+rd.getMinutes()).slice(-2)+'</div>'); }
-        return '<div class="typcard"><div class="tytitle">🌀 '+ttl+'</div>'+rows.join('')+
-          (t.specSample?('<div style="margin-top:8px;font-size:10px;color:#bbb;word-break:break-all"><b>詳細診断:</b><br>'+esc(t.specSample)+'</div>'):'')+
-          '</div>';
+        return '<div class="typcard"><div class="tytitle">🌀 '+ttl+'</div>'+rows.join('')+'</div>';
       }).join('');
-      html+='<div class="warntime" style="margin-top:4px">台風が接近する場合は、収穫の前倒しや資材の固定・退避など、早めの備えを。</div>';
     }
+    html+='<div class="warntime" style="margin-top:4px">活動中のすべての台風と進路予報は、上のボタンから気象庁の地図でご確認ください。台風が接近する場合は、収穫の前倒しや資材の固定・退避など、早めの備えを。</div>';
     const now=new Date();
     html+='<div class="warntime">アプリ確認：'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+'　／　出典：気象庁</div>';
-    if(j.listDebug){ html+='<div style="margin-top:14px;font-size:10px;color:#999;line-height:1.6;word-break:break-all"><b>一覧診断（件数'+esc(String(j.rawCount||0))+'）:</b><br>'+j.listDebug.map(esc).join('<br>')+'</div>'; }
     box.innerHTML=html;
   }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
 }
