@@ -2006,11 +2006,11 @@ async function loadWarn(){
     const j=await (await fetch(CONFIG.GAS_URL+'?action=jmaWarning')).json();
     if(!j||!j.ok){ box.innerHTML='<div class="note" style="padding:16px">気象庁の情報を取得できませんでした。'+esc((j&&j.error)||'')+'</div>'; return; }
     let html='';
-    if(j.headline) html+='<div class="warnhead">'+esc(j.headline)+'</div>';
-    if(!j.warnings||!j.warnings.length){
+    const has=(j.warnings&&j.warnings.length);
+    if(j.headline && has) html+='<div class="warnhead">'+esc(j.headline)+'</div>';
+    if(!has){
       html+='<div class="warnnone">✅ 現在、発表中の<br>警報・注意報はありません</div>';
     }else{
-      // 重い順（特別警報→警報→注意報）に並べる
       const order=w=>{ const n=w.name; return n.indexOf('特別警報')>=0?0:(n.indexOf('警報')>=0?1:2); };
       const sorted=j.warnings.slice().sort((a,b)=>order(a)-order(b));
       html+=sorted.map(function(w){
@@ -2019,8 +2019,9 @@ async function loadWarn(){
           '<div><div class="wn">'+esc(w.name)+'</div><div class="ws">'+lv.label+'　'+esc(w.status||'発表中')+'</div></div></div>';
       }).join('');
     }
-    if(j.report){ const d=new Date(j.report); if(!isNaN(d)) html+='<div class="warntime">気象庁発表：'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+' 時点</div>'; }
-    html+='<div class="warntime">出典：気象庁</div>';
+    if(j.report){ const d=new Date(j.report); if(!isNaN(d)) html+='<div class="warntime">気象庁の最終更新：'+(d.getMonth()+1)+'月'+d.getDate()+'日 '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+'</div>'; }
+    const now=new Date();
+    html+='<div class="warntime">アプリ確認：'+(now.getMonth()+1)+'月'+now.getDate()+'日 '+('0'+now.getHours()).slice(-2)+':'+('0'+now.getMinutes()).slice(-2)+'　／　出典：気象庁</div>';
     box.innerHTML=html;
   }catch(e){ box.innerHTML='<div class="note" style="padding:16px">通信に失敗しました。電波の良い場所で更新してください。</div>'; }
 }
