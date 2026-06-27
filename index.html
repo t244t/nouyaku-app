@@ -1953,10 +1953,13 @@ function saveWork(){
 
   // 修正モード：上書き保存
   if(editingWorkId){
+    const wid=editingWorkId;
+    const n=pendingWorkPhotos.length;
     const u=CONFIG.GAS_URL+'?action=updateWork&'+new URLSearchParams(Object.assign({id:editingWorkId}, rec)).toString();
     fetch(u).then(r=>r.json()).then(async(j)=>{
       if(j&&j.ok){
-        toast('作業記録を修正しました');
+        if(n>0){ toast('修正しました。写真'+n+'枚を保存中…'); await uploadWorkPhotos(wid); toast('写真'+n+'枚を保存しました'); }
+        else toast('作業記録を修正しました');
         editingWorkId=null; editingWorkRec=null; workCat=null;
         await loadWorkHistoryData();
         closeFieldSheet();
