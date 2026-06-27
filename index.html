@@ -2014,10 +2014,11 @@ async function uploadWorkPhotos(workId){
   if(!pendingWorkPhotos.length||!CONFIG.GAS_URL) return;
   for(const ph of pendingWorkPhotos){
     try{
-      await fetch(CONFIG.GAS_URL,{ method:'POST',
+      const res=await fetch(CONFIG.GAS_URL,{ method:'POST',
         body:JSON.stringify({action:'uploadPhoto',記録ID:workId,種別:'作業',
           ファイル名:ph.name,mimeType:ph.mime,dataB64:ph.dataUrl}) });
-    }catch(err){ /* 応答は読まない設計。保存可否はlistPhotosで確認 */ }
+      await res.text(); // 保存完了を待ってから次へ（待たないと一覧更新が間に合わない）
+    }catch(err){ /* 保存可否はlistPhotosで確認 */ }
   }
   pendingWorkPhotos=[];
 }
