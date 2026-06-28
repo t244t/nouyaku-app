@@ -276,6 +276,40 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #fertView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #fertView.show{display:flex}
 #fertBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+#keihiView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#keihiView.show{display:flex}
+.keihibar{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.kyear{width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:9px;font-size:18px;font-weight:800;color:var(--stem-dk);cursor:pointer}
+.kyearlbl{font-size:16px;font-weight:800;color:var(--stem-dk);min-width:74px;text-align:center}
+.ktabs{margin-left:auto;display:flex;gap:6px}
+.ktab{border:1px solid var(--line);background:#fff;color:var(--stem-dk);border-radius:999px;padding:7px 16px;font-size:13px;font-weight:800;cursor:pointer}
+.ktab.on{background:var(--stem);color:#fff;border-color:var(--stem)}
+.ksum{display:flex;gap:8px;margin-bottom:14px}
+.ksum .kbox{flex:1;background:var(--card);border:1px solid var(--line);border-radius:13px;padding:12px 10px;text-align:center;box-shadow:var(--shadow)}
+.ksum .kbox .kl{font-size:11.5px;color:var(--sub);font-weight:700}
+.ksum .kbox .kv{font-size:17px;font-weight:900;margin-top:4px;line-height:1.2}
+.ksum .kin .kv{color:#1b7a3d}
+.ksum .kout .kv{color:#b3261e}
+.ksum .knet .kv{color:var(--stem-dk)}
+.ksum .knet.minus .kv{color:#b3261e}
+.krow{display:flex;align-items:center;gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:var(--shadow);cursor:pointer}
+.krow .krl{flex:1;min-width:0}
+.krow .kname{font-size:14px;font-weight:800;color:var(--ink)}
+.krow .kmeta{font-size:11.5px;color:var(--sub);margin-top:2px}
+.krow .kamt{font-size:15px;font-weight:900;white-space:nowrap}
+.krow .kamt.in{color:#1b7a3d}
+.krow .kamt.out{color:#b3261e}
+.kbar{height:9px;border-radius:6px;background:#eef1ea;overflow:hidden;margin-top:6px}
+.kbar > i{display:block;height:100%;border-radius:6px}
+.ksec{font-size:13px;font-weight:800;color:var(--stem-dk);margin:16px 2px 9px}
+.kbreak{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 13px;box-shadow:var(--shadow)}
+.kbreak .kbr{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:13px}
+.kbreak .kbr:last-child{border-bottom:0}
+.kbreak .kbr .kbn{color:var(--ink);font-weight:700}
+.kbreak .kbr .kbv{font-weight:800;color:#b3261e}
+.kseg{display:flex;background:#E7EBE2;border-radius:11px;padding:3px;gap:3px}
+.kseg .ksegb{flex:1;border:0;background:transparent;border-radius:9px;padding:10px;font-size:14px;font-weight:800;color:var(--sub);cursor:pointer}
+.kseg .ksegb.on{background:#fff;color:var(--stem-dk);box-shadow:0 1px 3px rgba(0,0,0,.12)}
 #warnView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #warnView.show{display:flex}
 #typhoonView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
@@ -589,6 +623,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21V8l7-4 7 4v13"/><path d="M9 21v-6h6v6"/><path d="M9 11h0M15 11h0"/></svg>
         <span>肥料在庫</span>
       </button>
+      <button class="tile" id="openKeihi">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
+        <span>収支（のうかぼ）</span>
+      </button>
     </div>
 
     <div class="eyebrow">天気</div>
@@ -778,6 +816,24 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </div>
 
 <div id="photoView"><button class="pvclose" id="pvClose">✕</button><img id="pvImg" src="" alt=""></div>
+
+<div id="keihiView">
+  <div class="calhead">
+    <h2>収支（のうかぼ）</h2>
+    <button class="maddbtn" id="keihiAddBtn">＋ 記録</button>
+    <button class="mclose" id="keihiCloseBtn">閉じる</button>
+  </div>
+  <div class="keihibar">
+    <button class="kyear" id="keihiPrevY">‹</button>
+    <span id="keihiYearLbl" class="kyearlbl">2026年</span>
+    <button class="kyear" id="keihiNextY">›</button>
+    <div class="ktabs">
+      <button class="ktab on" data-t="month">月別</button>
+      <button class="ktab" data-t="item">品目別</button>
+    </div>
+  </div>
+  <div id="keihiBody" class="calbody" style="padding:12px 14px 40px;overflow:auto"></div>
+</div>
 
 <div id="fertView">
   <div class="calhead">
@@ -2030,6 +2086,165 @@ document.getElementById('closeMap').onclick=()=>{ closeFieldSheet(); document.ge
 document.getElementById('locate').onclick=()=>{ if(mapObj) mapObj.locate({setView:true,maxZoom:17}); };
 document.getElementById('addField').onclick=openFieldForm;
 document.getElementById('openWork').onclick=openWorkForm;
+/* ============== 収支（のうかぼ） ============== */
+const KEIHI_SELLERS=['本店','東支店','西支店','南支店','北支店','中央支店','出荷','その他'];
+const KEIHI_COSTS=['種苗','肥料','農薬','燃料','資材','人件費','その他'];
+const KEIHI_ITEMS=['お米','なすび','きゅうり','キャベツ','じゃがいも','スナップエンドウ','さつまいも','オクラ','トウモロコシ','ピーマン','トマト','落花生','レタス','シシトウ','ホウレン草','ニンニク','人参','玉ねぎ'];
+let keihiList=[], keihiYear=(new Date()).getFullYear(), keihiTab='month', editingKeihiId=null;
+function yen(n){ return '¥'+(Number(n)||0).toLocaleString('ja-JP'); }
+async function loadKeihiData(){
+  keihiList=[];
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listKeihi&year='+keihiYear)).json(); keihiList=(j&&j.records)?j.records:[]; }catch(e){ keihiList=[]; }
+}
+async function openKeihi(){
+  document.getElementById('keihiView').classList.add('show');
+  document.getElementById('keihiBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
+  await loadKeihiData();
+  renderKeihi();
+}
+function setKeihiYear(y){ keihiYear=y; document.getElementById('keihiYearLbl').textContent=y+'年'; openKeihi(); }
+function renderKeihi(){
+  document.getElementById('keihiYearLbl').textContent=keihiYear+'年';
+  const box=document.getElementById('keihiBody'); if(!box) return;
+  const inc=keihiList.filter(r=>String(r['種別'])==='収入');
+  const exp=keihiList.filter(r=>String(r['種別'])==='支出');
+  const sumIn=inc.reduce((a,r)=>a+(Number(r['金額'])||0),0);
+  const sumOut=exp.reduce((a,r)=>a+(Number(r['金額'])||0),0);
+  const net=sumIn-sumOut;
+  let html='';
+  html+='<div class="ksum">'+
+    '<div class="kbox kin"><div class="kl">収入</div><div class="kv">'+yen(sumIn)+'</div></div>'+
+    '<div class="kbox kout"><div class="kl">支出</div><div class="kv">'+yen(sumOut)+'</div></div>'+
+    '<div class="kbox knet'+(net<0?' minus':'')+'"><div class="kl">収支</div><div class="kv">'+(net<0?'-':'')+yen(Math.abs(net))+'</div></div>'+
+    '</div>';
+  if(!keihiList.length){ box.innerHTML=html+'<div class="note" style="padding:16px">'+keihiYear+'年の記録はまだありません。「＋ 記録」から収入・支出を記録できます。</div>'; return; }
+  html+= (keihiTab==='month') ? keihiMonthHtml(inc,exp) : keihiItemHtml(inc,exp);
+  box.innerHTML=html;
+  box.querySelectorAll('.krow[data-id]').forEach(el=>el.onclick=()=>openKeihiDetail(el.dataset.id));
+}
+function keihiMonthHtml(inc,exp){
+  const mi=new Array(12).fill(0), mo=new Array(12).fill(0);
+  inc.forEach(r=>{ const m=parseInt(String(r['日付']).slice(5,7),10); if(m>=1&&m<=12) mi[m-1]+=Number(r['金額'])||0; });
+  exp.forEach(r=>{ const m=parseInt(String(r['日付']).slice(5,7),10); if(m>=1&&m<=12) mo[m-1]+=Number(r['金額'])||0; });
+  const maxV=Math.max(1,...mi,...mo);
+  let h='<div class="ksec">月別の収支</div>';
+  for(let m=0;m<12;m++){
+    if(mi[m]===0&&mo[m]===0) continue;
+    const net=mi[m]-mo[m];
+    h+='<div class="krow" style="cursor:default"><div class="krl"><div class="kname">'+(m+1)+'月</div>'+
+      '<div class="kmeta">収入 '+yen(mi[m])+' ／ 支出 '+yen(mo[m])+'</div>'+
+      '<div class="kbar"><i style="width:'+(mi[m]/maxV*100)+'%;background:#3ea76a"></i></div>'+
+      '<div class="kbar"><i style="width:'+(mo[m]/maxV*100)+'%;background:#e07a7a"></i></div>'+
+      '</div><div class="kamt '+(net<0?'out':'in')+'">'+(net<0?'-':'')+yen(Math.abs(net))+'</div></div>';
+  }
+  // 費目別の支出内訳
+  const byCost={};
+  exp.forEach(r=>{ const c=String(r['費目']||'その他'); byCost[c]=(byCost[c]||0)+(Number(r['金額'])||0); });
+  const costs=Object.keys(byCost).sort((a,b)=>byCost[b]-byCost[a]);
+  if(costs.length){
+    h+='<div class="ksec">費目別の支出</div><div class="kbreak">';
+    costs.forEach(c=>{ h+='<div class="kbr"><span class="kbn">'+esc(c)+'</span><span class="kbv">'+yen(byCost[c])+'</span></div>'; });
+    h+='</div>';
+  }
+  return h;
+}
+function keihiItemHtml(inc,exp){
+  // 品目別：収入と、品目を指定した支出。指定なしは共通へ
+  const items={}; let commonOut=0;
+  inc.forEach(r=>{ const it=String(r['品目']||'').trim()||'（品目なし）'; (items[it]=items[it]||{in:0,out:0}).in+=Number(r['金額'])||0; });
+  exp.forEach(r=>{ const it=String(r['品目']||'').trim(); if(!it){ commonOut+=Number(r['金額'])||0; return; } (items[it]=items[it]||{in:0,out:0}).out+=Number(r['金額'])||0; });
+  const names=Object.keys(items).sort((a,b)=>(items[b].in-items[b].out)-(items[a].in-items[a].out));
+  let h='<div class="ksec">品目別の収支</div>';
+  if(!names.length) h+='<div class="note">品目別のデータがありません。</div>';
+  names.forEach(it=>{
+    const o=items[it]; const net=o.in-o.out;
+    h+='<div class="krow" style="cursor:default"><div class="krl"><div class="kname">'+esc(it)+'</div>'+
+      '<div class="kmeta">収入 '+yen(o.in)+' ／ 支出 '+yen(o.out)+'</div></div>'+
+      '<div class="kamt '+(net<0?'out':'in')+'">'+(net<0?'-':'')+yen(Math.abs(net))+'</div></div>';
+  });
+  if(commonOut>0){
+    h+='<div class="ksec">共通の支出（品目指定なし）</div>'+
+      '<div class="krow" style="cursor:default"><div class="krl"><div class="kname">共通経費</div>'+
+      '<div class="kmeta">燃料・資材など品目をまたぐ支出</div></div>'+
+      '<div class="kamt out">-'+yen(commonOut)+'</div></div>';
+  }
+  return h;
+}
+function keihiFormHtml(r){
+  r=r||{};
+  const isInc=(r['種別']||'収入')==='収入';
+  const itemOpts='<option value="">（品目を選択）</option>'+KEIHI_ITEMS.map(it=>'<option'+(r['品目']===it?' selected':'')+'>'+esc(it)+'</option>').join('');
+  const sellerOpts='<option value="">（販売先を選択）</option>'+KEIHI_SELLERS.map(s=>'<option'+(r['販売先']===s?' selected':'')+'>'+esc(s)+'</option>').join('');
+  const costOpts=KEIHI_COSTS.map(c=>'<option'+(r['費目']===c?' selected':'')+'>'+esc(c)+'</option>').join('');
+  const today=todayStr();
+  return '<div class="fh"><div class="nm">'+(r['収支ID']?'収支を編集':'収支を記録')+'</div></div>'+
+    '<div class="field"><label>種別</label><div class="kseg" id="k_kind">'+
+      '<button type="button" class="ksegb'+(isInc?' on':'')+'" data-v="収入">収入</button>'+
+      '<button type="button" class="ksegb'+(!isInc?' on':'')+'" data-v="支出">支出</button></div></div>'+
+    '<div class="field"><label>日付</label><input id="k_date" type="date" value="'+esc(r['日付']||today)+'"></div>'+
+    '<div class="field" id="k_costwrap"><label>費目（支出のとき）</label><select id="k_cost">'+costOpts+'</select></div>'+
+    '<div class="field"><label>品目（任意）</label><select id="k_item">'+itemOpts+'</select></div>'+
+    '<div class="field" id="k_sellerwrap"><label>販売先（収入のとき・任意）</label><select id="k_seller">'+sellerOpts+'</select></div>'+
+    '<div class="field"><label>摘要</label><input id="k_note" value="'+esc(r['摘要']||'')+'" placeholder="例：なす直売 / 肥料購入など"></div>'+
+    '<div class="field"><label>金額（円）</label><input id="k_amt" inputmode="numeric" value="'+esc(r['金額']!=null&&r['金額']!==''?String(r['金額']):'')+'" placeholder="例：12000"></div>'+
+    '<div class="field"><label>メモ（任意）</label><input id="k_memo" value="'+esc(r['メモ']||'')+'"></div>'+
+    '<button class="save" id="k_save">'+(r['収支ID']?'上書き保存':'記録する')+'</button>'+
+    (r['収支ID']?'<button class="save" id="k_del" style="background:#fff;color:#b3261e;border:1px solid #e6b4ae;margin-top:8px">この記録を削除</button>':'');
+}
+function applyKeihiKind(){
+  const seg=document.getElementById('k_kind'); if(!seg) return;
+  const kind=seg.querySelector('.ksegb.on')?seg.querySelector('.ksegb.on').dataset.v:'収入';
+  document.getElementById('k_costwrap').style.display=(kind==='支出')?'':'none';
+  document.getElementById('k_sellerwrap').style.display=(kind==='収入')?'':'none';
+}
+function openKeihiForm(r){
+  editingKeihiId=(r&&r['収支ID'])?r['収支ID']:null;
+  const sh=document.getElementById('fSheetIn'); if(!sh) return;
+  sh.innerHTML=keihiFormHtml(r||{});
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  document.getElementById('fSheet').scrollTop=0;
+  const seg=document.getElementById('k_kind');
+  seg.querySelectorAll('.ksegb').forEach(b=>b.onclick=()=>{ seg.querySelectorAll('.ksegb').forEach(x=>x.classList.remove('on')); b.classList.add('on'); applyKeihiKind(); });
+  applyKeihiKind();
+  document.getElementById('k_save').onclick=saveKeihi;
+  const dl=document.getElementById('k_del'); if(dl) dl.onclick=()=>deleteKeihi(editingKeihiId);
+}
+function openKeihiDetail(id){ const r=keihiList.find(x=>String(x['収支ID'])===id); if(r) openKeihiForm(r); }
+async function saveKeihi(){
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  const v=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+  const seg=document.getElementById('k_kind');
+  const kind=seg.querySelector('.ksegb.on')?seg.querySelector('.ksegb.on').dataset.v:'収入';
+  const amt=v('k_amt').replace(/[^0-9.\-]/g,'');
+  if(!amt||Number(amt)<=0){ toast('金額を入力してください'); return; }
+  const rec={日付:v('k_date'), 種別:kind, 品目:v('k_item'),
+    費目:(kind==='支出'?v('k_cost'):''), 販売先:(kind==='収入'?v('k_seller'):''),
+    摘要:v('k_note'), 金額:amt, メモ:v('k_memo'), 記録者:RECORDER};
+  const btn=document.getElementById('k_save'); if(guardBtn(btn)===false) return;
+  try{
+    if(editingKeihiId){
+      await fetch(CONFIG.GAS_URL+'?action=updateKeihi&'+new URLSearchParams(Object.assign({id:editingKeihiId},rec)));
+    }else{
+      await fetch(CONFIG.GAS_URL+'?action=addKeihi&'+new URLSearchParams(rec));
+    }
+    toast('保存しました');
+    closeFieldSheet();
+    await loadKeihiData(); renderKeihi();
+  }catch(e){ toast('保存に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
+async function deleteKeihi(id){
+  if(!id) return;
+  if(!confirm('この記録を削除します。よろしいですか？\n（この操作は取り消せません）')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=deleteKeihi&'+new URLSearchParams({id:id}))).json();
+    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadKeihiData(); renderKeihi(); }
+    else toast('削除に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
+}
 /* ============== 作業写真の拡大表示 ============== */
 function openPhotoView(url){
   const v=document.getElementById('photoView'); const im=document.getElementById('pvImg');
@@ -2569,6 +2784,15 @@ document.getElementById('radarNext').onclick=()=>{ radarStop(); showRadarFrame(r
 document.getElementById('openWorkHist').onclick=openWorkHist;
 document.getElementById('openTools').onclick=openTools;
 document.getElementById('openFert').onclick=openFert;
+document.getElementById('openKeihi').onclick=openKeihi;
+document.getElementById('keihiCloseBtn').onclick=()=>document.getElementById('keihiView').classList.remove('show');
+document.getElementById('keihiAddBtn').onclick=()=>openKeihiForm(null);
+document.getElementById('keihiPrevY').onclick=()=>setKeihiYear(keihiYear-1);
+document.getElementById('keihiNextY').onclick=()=>setKeihiYear(keihiYear+1);
+document.querySelectorAll('#keihiView .ktab').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#keihiView .ktab').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); keihiTab=b.dataset.t; renderKeihi();
+});
 document.getElementById('openWarn').onclick=openWarn;
 document.getElementById('warnCloseBtn').onclick=()=>document.getElementById('warnView').classList.remove('show');
 document.getElementById('warnReload').onclick=loadWarn;
