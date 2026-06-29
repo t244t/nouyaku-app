@@ -820,9 +820,11 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 <div id="keihiView">
   <div class="calhead">
     <h2>収支（のうかぼ）</h2>
+    <button class="maddbtn" id="keihiCsvBtn">CSV取込</button>
     <button class="maddbtn" id="keihiAddBtn">＋ 記録</button>
     <button class="mclose" id="keihiCloseBtn">閉じる</button>
   </div>
+  <input type="file" id="keihiCsvFile" accept=".csv" style="display:none">
   <div class="keihibar">
     <button class="kyear" id="keihiPrevY">‹</button>
     <span id="keihiYearLbl" class="kyearlbl">2026年</span>
@@ -2245,6 +2247,107 @@ async function deleteKeihi(id){
     else toast('削除に失敗しました：'+esc((j&&j.error)||''));
   }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
 }
+/* CSV取込（伊都国即売会 生産者別売上集計表） */
+const KEIHI_ITEMMAP={
+  '胡瓜':'きゅうり','ｷｭｳﾘ':'きゅうり','きゅうり':'きゅうり',
+  'なす':'なすび','白なす':'なすび','ﾅｽ':'なすび',
+  'ﾋﾟｰﾏﾝ':'ピーマン','ピーマン':'ピーマン',
+  'ｷｬﾍﾞﾂ':'キャベツ','キャベツ':'キャベツ','早生キャベツ':'キャベツ',
+  'ﾒｰｸｲﾝ':'じゃがいも','バレイショ':'じゃがいも','ﾊﾞﾚｲｼｮ':'じゃがいも','じゃがいも':'じゃがいも',
+  '玉ねぎ':'玉ねぎ','新たまねぎ':'玉ねぎ','ﾀﾏﾈｷﾞ':'玉ねぎ',
+  'レタス':'レタス','ｻﾆｰﾚﾀｽ':'レタス','ｸﾞﾘｰﾝﾘｰﾌ':'レタス','サニーレタス':'レタス','グリーンリーフ':'レタス',
+  'ｽﾅｯﾌﾟｴﾝﾄﾞｳ':'スナップエンドウ','スナップエンドウ':'スナップエンドウ',
+  'ﾄｳﾓﾛｺｼ':'トウモロコシ','とうもろこし':'トウモロコシ',
+  'ｵｸﾗ':'オクラ','オクラ':'オクラ',
+  'ﾄﾏﾄ':'トマト','トマト':'トマト',
+  'ﾆﾝﾆｸ':'ニンニク','にんにく':'ニンニク',
+  '人参':'人参','ﾆﾝｼﾞﾝ':'人参','にんじん':'人参',
+  'ﾎｳﾚﾝｿｳ':'ホウレン草','ほうれん草':'ホウレン草',
+  '甘長とうがらし':'シシトウ','ｼｼﾄｳ':'シシトウ','シシトウ':'シシトウ',
+  '落花生':'落花生','ﾗｯｶｾｲ':'落花生',
+  'さつまいも':'さつまいも','ｻﾂﾏｲﾓ':'さつまいも',
+  'お米':'お米','米':'お米'
+};
+function mapKeihiItem(name){
+  const n=String(name||'').trim();
+  return KEIHI_ITEMMAP[n] || n; // 対応表になければ元の名前のまま
+}
+function openKeihiCsv(){
+  const f=document.getElementById('keihiCsvFile'); if(f){ f.value=''; f.click(); }
+}
+function decodeSjis(buf){
+  try{ return new TextDecoder('shift_jis').decode(buf); }
+  catch(e){ try{ return new TextDecoder('windows-31j').decode(buf); }catch(e2){ return new TextDecoder('utf-8').decode(buf); } }
+}
+function parseCsvLine(line){
+  const out=[]; let cur='', q=false;
+  for(let i=0;i<line.length;i++){ const c=line[i];
+    if(q){ if(c==='"'){ if(line[i+1]==='"'){ cur+='"'; i++; } else q=false; } else cur+=c; }
+    else { if(c==='"') q=true; else if(c===','){ out.push(cur); cur=''; } else cur+=c; }
+  }
+  out.push(cur); return out;
+}
+async function onKeihiCsvPicked(e){
+  const file=e.target.files&&e.target.files[0]; if(!file) return;
+  let text='';
+  try{ const buf=await file.arrayBuffer(); text=decodeSjis(new Uint8Array(buf)); }
+  catch(err){ toast('CSVを読み込めませんでした'); return; }
+  const lines=text.split(/\r?\n/).filter(l=>l.trim()!=='');
+  if(lines.length<2){ toast('CSVにデータがありません'); return; }
+  // 列index：16=店舗名,22=名称,34=売上数,36=売価金額
+  const agg={}; // 品目→金額
+  let total=0, rows=0;
+  for(let i=1;i<lines.length;i++){
+    const c=parseCsvLine(lines[i]); if(c.length<37) continue;
+    const item=mapKeihiItem(c[22]);
+    const amt=Math.round(parseFloat(c[36]||'0')||0);
+    if(!item||!amt) continue;
+    agg[item]=(agg[item]||0)+amt; total+=amt; rows++;
+  }
+  const items=Object.keys(agg); if(!items.length){ toast('売上データを読み取れませんでした'); return; }
+  openKeihiCsvConfirm(agg, total, rows);
+}
+let pendingCsvAgg=null;
+function openKeihiCsvConfirm(agg, total, rows){
+  pendingCsvAgg=agg;
+  const sh=document.getElementById('fSheetIn'); if(!sh) return;
+  const items=Object.keys(agg).sort((a,b)=>agg[b]-agg[a]);
+  const ym=(keihiYear)+'-'+('0'+((new Date()).getMonth()+1)).slice(-2);
+  let h='<div class="fh"><div class="nm">売上CSVの取込</div></div>'+
+    '<div class="note" style="margin-bottom:10px">'+rows+'件を読み取り、品目別にまとめました。合計 '+yen(total)+'。<br>下の対象年月で、収入として記録します。</div>'+
+    '<div class="field"><label>対象年月</label><input id="csv_ym" type="month" value="'+ym+'"></div>'+
+    '<div class="kbreak" style="margin-bottom:14px">';
+  items.forEach(it=>{ h+='<div class="kbr"><span class="kbn">'+esc(it)+'</span><span class="kbv" style="color:#1b7a3d">'+yen(agg[it])+'</span></div>'; });
+  h+='</div>'+
+    '<button class="save" id="csv_save">この内容で取り込む（'+items.length+'品目）</button>';
+  sh.innerHTML=h;
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  document.getElementById('fSheet').scrollTop=0;
+  document.getElementById('csv_save').onclick=()=>runKeihiCsvImport();
+}
+async function runKeihiCsvImport(){
+  if(!pendingCsvAgg||!CONFIG.GAS_URL){ toast('取込データがありません'); return; }
+  const ym=document.getElementById('csv_ym').value || ((keihiYear)+'-01');
+  const m=ym.match(/(\d{4})-(\d{2})/); if(!m){ toast('対象年月を選んでください'); return; }
+  const lastDay=new Date(+m[1], +m[2], 0).getDate();
+  const date=m[1]+'-'+m[2]+'-'+('0'+lastDay).slice(-2);
+  const label=(+m[1])+'年'+(+m[2])+'月分・CSV取込';
+  const btn=document.getElementById('csv_save'); if(guardBtn(btn)===false) return;
+  const items=Object.keys(pendingCsvAgg);
+  let ok=0;
+  try{
+    for(const it of items){
+      const rec={日付:date, 種別:'収入', 品目:it, 費目:'', 販売先:'即売会', 摘要:label, 金額:String(pendingCsvAgg[it]), メモ:'', 記録者:RECORDER};
+      await fetch(CONFIG.GAS_URL+'?action=addKeihi&'+new URLSearchParams(rec)); ok++;
+    }
+    toast(ok+'品目を取り込みました');
+    pendingCsvAgg=null;
+    keihiYear=+m[1]; closeFieldSheet();
+    await loadKeihiData(); renderKeihi();
+  }catch(e){ toast('取込に失敗しました。通信を確認してください'); }
+  finally{ unguardBtn(btn); }
+}
 /* ============== 作業写真の拡大表示 ============== */
 function openPhotoView(url){
   const v=document.getElementById('photoView'); const im=document.getElementById('pvImg');
@@ -2787,6 +2890,8 @@ document.getElementById('openFert').onclick=openFert;
 document.getElementById('openKeihi').onclick=openKeihi;
 document.getElementById('keihiCloseBtn').onclick=()=>document.getElementById('keihiView').classList.remove('show');
 document.getElementById('keihiAddBtn').onclick=()=>openKeihiForm(null);
+document.getElementById('keihiCsvBtn').onclick=openKeihiCsv;
+document.getElementById('keihiCsvFile').onchange=onKeihiCsvPicked;
 document.getElementById('keihiPrevY').onclick=()=>setKeihiYear(keihiYear-1);
 document.getElementById('keihiNextY').onclick=()=>setKeihiYear(keihiYear+1);
 document.querySelectorAll('#keihiView .ktab').forEach(b=>b.onclick=()=>{
