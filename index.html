@@ -2312,10 +2312,13 @@ function openKeihiCsvConfirm(agg, total, rows){
   pendingCsvAgg=agg;
   const sh=document.getElementById('fSheetIn'); if(!sh) return;
   const items=Object.keys(agg).sort((a,b)=>agg[b]-agg[a]);
-  const ym=(keihiYear)+'-'+('0'+((new Date()).getMonth()+1)).slice(-2);
+  // 初期値は先month（精算は前月分が届くことが多い）
+  const now=new Date(); const last=new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const ym=last.getFullYear()+'-'+('0'+(last.getMonth()+1)).slice(-2);
   let h='<div class="fh"><div class="nm">売上CSVの取込</div></div>'+
-    '<div class="note" style="margin-bottom:10px">'+rows+'件を読み取り、品目別にまとめました。合計 '+yen(total)+'。<br>下の対象年月で、収入として記録します。</div>'+
-    '<div class="field"><label>対象年月</label><input id="csv_ym" type="month" value="'+ym+'"></div>'+
+    '<div class="note" style="margin-bottom:10px">'+rows+'件を読み取り、品目別にまとめました。合計 '+yen(total)+'。</div>'+
+    '<div class="field"><label>対象年月（この月の売上として記録）</label><input id="csv_ym" type="month" value="'+ym+'"></div>'+
+    '<div class="note" style="margin:-4px 2px 10px;color:#9a7a00">⚠️ 取り込む月を必ず確認してください。同じ月を再取込すると、置き換えるか確認します。</div>'+
     '<div class="kbreak" style="margin-bottom:14px">';
   items.forEach(it=>{ h+='<div class="kbr"><span class="kbn">'+esc(it)+'</span><span class="kbv" style="color:#1b7a3d">'+yen(agg[it])+'</span></div>'; });
   h+='</div>'+
@@ -2330,6 +2333,12 @@ async function runKeihiCsvImport(){
   if(!pendingCsvAgg||!CONFIG.GAS_URL){ toast('取込データがありません'); return; }
   const ym=document.getElementById('csv_ym').value || ((keihiYear)+'-01');
   const m=ym.match(/(\d{4})-(\d{2})/); if(!m){ toast('対象年月を選んでください'); return; }
+  const ymPref=m[1]+'-'+m[2];
+  // 既にその月のCSV取込分があるか確認
+  const dup=keihiList.filter(r=>String(r['種別'])==='収入' && String(r['摘要']||'').indexOf('CSV取込')>=0 && String(r['日付']).slice(0,7)===ymPref);
+  if(dup.length){
+    if(!confirm((+m[1])+'年'+(+m[2])+'月分は既に取り込み済みです（'+dup.length+'品目）。\n古い取込分を消して、置き換えますか？')) return;
+  }
   const lastDay=new Date(+m[1], +m[2], 0).getDate();
   const date=m[1]+'-'+m[2]+'-'+('0'+lastDay).slice(-2);
   const label=(+m[1])+'年'+(+m[2])+'月分・CSV取込';
@@ -2337,6 +2346,8 @@ async function runKeihiCsvImport(){
   const items=Object.keys(pendingCsvAgg);
   let ok=0;
   try{
+    // 同月の旧CSV取込分を必ず削除してから入れる（二重防止）
+    await fetch(CONFIG.GAS_URL+'?action=deleteKeihiCsvMonth&'+new URLSearchParams({ym:ymPref}));
     for(const it of items){
       const rec={日付:date, 種別:'収入', 品目:it, 費目:'', 販売先:'即売会', 摘要:label, 金額:String(pendingCsvAgg[it]), メモ:'', 記録者:RECORDER};
       await fetch(CONFIG.GAS_URL+'?action=addKeihi&'+new URLSearchParams(rec)); ok++;
