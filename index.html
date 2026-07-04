@@ -90,6 +90,15 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .alert.dry{background:#fff6e5;border-color:#f0dca8;color:#8a5a00}
 .alert.disease{background:#f0f6ee;border-color:#cfe3c4;color:#3a6b2e}
 .alert.calm{background:#f4f6f4;border-color:var(--line);color:var(--sub)}
+.tip{display:flex;gap:9px;align-items:flex-start;border-radius:12px;padding:11px 13px;margin:6px 0;font-size:.87rem;line-height:1.55;border:1px solid}
+.tip .ti{font-size:1.15rem;line-height:1.2}
+.tip .tt{font-weight:800;margin-bottom:1px}
+.tip.pt-do{background:#eef6ff;border-color:#c3dcf5;color:#1a4e8a}
+.tip.pt-guard{background:#fdeeee;border-color:#f0c2c2;color:#9a2626}
+.tip.pt-water{background:#eaf5fb;border-color:#bcdcec;color:#1a5e7a}
+.tip.pt-heat{background:#fff2e8;border-color:#f3ceac;color:#9a5320}
+.tip.pt-check{background:#f3f2ea;border-color:#ddd8c0;color:#6b6134}
+.tipshd{font-size:.72rem;font-weight:800;color:var(--stem-dk);letter-spacing:.04em;margin:8px 2px 2px}
 #weekWx{margin:8px 0 2px}
 #hourWx{margin:8px 0 2px}
 .hwwrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 4px 10px 12px;box-shadow:var(--shadow)}
@@ -549,6 +558,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div id="todaySummary"></div>
 
   <div id="recBar"></div>
+
+  <div id="tipsBar"></div>
 
   <div id="alertBar"></div>
 
@@ -2955,6 +2966,66 @@ const ALERT_CFG = {
 };
 function md(iso){ const d=new Date(iso+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }
 function dayLabel(i){ return i===0?'今日':i===1?'明日':i===2?'あさって':(i+'日後'); }
+/* ============== 今日の作業ポイント ============== */
+function growing_(name){ return (typeof GROWING!=='undefined') && GROWING.some(function(c){ return String(c).indexOf(name)>=0; }); }
+function computeTips(dl){
+  const tips=[];
+  const t=(dl&&dl.time)||[], prob=(dl&&dl.precip_prob)||[], precip=(dl&&dl.precip)||[],
+        tmax=(dl&&dl.tmax)||[], wind=(dl&&dl.wind)||[];
+  const N=t.length;
+  const mon=(new Date()).getMonth()+1;
+
+  // 1) 雨上がり：昨日〜今日に雨、これから数日は下がる → 水捌け確認
+  //   （今日の降水確率が下がり傾向 or 直近に降水量があった場合）
+  const todayProb=prob[0]!=null?prob[0]:0, todayPrec=precip[0]!=null?precip[0]:0;
+  const tmrProb=prob[1]!=null?prob[1]:0;
+  if((todayPrec>=3 || todayProb>=60) && tmrProb<todayProb){
+    tips.push({type:'pt-water', icon:'💧', title:'水捌けの確認を',
+      msg:'雨（の名残）があります。畑の停滞水・ぬかるみを見回り、排水路の詰まりを確認しましょう。'});
+  }
+
+  // 2) 高温継続 → 灌水・作業時間
+  var hotDays=0; for(var i=0;i<Math.min(3,N);i++){ if((tmax[i]||0)>=30) hotDays++; }
+  if(hotDays>=2){
+    tips.push({type:'pt-heat', icon:'🥵', title:'高温に備えを',
+      msg:'高温が続く予報です。朝夕の灌水と、暑い時間帯を避けた作業を。定植直後の株は特に水切れに注意。'});
+  }
+
+  // 3) 害獣：トウモロコシ（アライグマ被害あり）
+  if(growing_('トウモロコシ') || growing_('とうもろこし')){
+    tips.push({type:'pt-guard', icon:'🦝', title:'トウモロコシの獣害に注意',
+      msg:'実る時期はアライグマ・カラス・サルなどに狙われやすくなります。夜間の被害に注意し、囲い・ネット・電気柵の隙間やたるみを点検しましょう。'});
+  }
+  // 4) 害獣：さつまいも（電気柵 設置予定）
+  if(growing_('さつまいも') || growing_('サツマイモ')){
+    tips.push({type:'pt-guard', icon:'⚡', title:'さつまいもの電気柵',
+      msg:'猪・アライグマの掘り返しに備え、電気柵の設置はお済みですか。設置済みなら、通電と地際の隙間を点検しましょう。'});
+  }
+
+  // 5) 定期の見回り・害獣点検（該当が少ない日に、日替わりで1つ）
+  const rotate=[
+    {type:'pt-check', icon:'🔍', title:'ほ場の見回り', msg:'病害虫の初期発見が被害を小さくします。葉裏・株元・生長点を中心に見回りましょう。'},
+    {type:'pt-check', icon:'🛡️', title:'害獣対策の点検', msg:'電気柵の通電、囲い・防鳥ネットの隙間やたるみは大丈夫ですか。夕方までに点検を。'},
+    {type:'pt-check', icon:'📷', title:'記録の習慣', msg:'作業や気づきは写真つきで記録しておくと、あとで見返せて対策に役立ちます。'}
+  ];
+  const doy=Math.floor((Date.now()/86400000));
+  tips.push(rotate[doy%rotate.length]);
+
+  return tips;
+}
+function renderTips(){
+  const box=document.getElementById('tipsBar'); if(!box) return;
+  const tips=computeTips(SUM.daily||{});
+  if(!tips.length){ box.innerHTML=''; return; }
+  // 最大2件（獣害・天気を優先、最後に定期を1つ）
+  const priority=tips.filter(function(x){ return x.type!=='pt-check'; }).slice(0,2);
+  const routine=tips.filter(function(x){ return x.type==='pt-check'; }).slice(0,1);
+  const show=(priority.length>=2?priority:priority.concat(routine)).slice(0,2);
+  box.innerHTML='<div class="tipshd">🌱 今日の作業ポイント</div>'+show.map(function(a){
+    return '<div class="tip '+a.type+'"><span class="ti">'+a.icon+'</span>'+
+      '<div><div class="tt">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>';
+  }).join('');
+}
 function computeAlerts(dl){
   const al=[];
   const t=dl.time||[], wind=dl.wind||[], gust=dl.gust||[], snow=dl.snow||[],
@@ -3010,20 +3081,18 @@ async function loadAlerts(retry){
   const bar=document.getElementById('alertBar');
   const wk0=document.getElementById('weekWx');
   if(wk0 && !retry) wk0.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:8px 4px;color:#9bb0a0">天気を取得中…</div>';
-  if(!CONFIG.GAS_URL){ if(wk0) wk0.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">診断：GAS_URLが設定されていません。</div>'; return; }
+  if(!CONFIG.GAS_URL) return;
   try{
     const res=await fetch(CONFIG.GAS_URL+'?action=forecast');
-    const raw=await res.text();
-    let fc=null; try{ fc=JSON.parse(raw); }catch(e){ fc=null; }
+    const fc=await res.json();
     if(!fc||!fc.daily){
-      const wk=document.getElementById('weekWx');
-      if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div>'+
-        '<div class="note" style="padding:10px 4px;font-size:11px;color:#999;word-break:break-all">診断：天気データを取得できませんでした。<br>ok='+(fc?String(fc.ok):'なし')+' error='+esc((fc&&fc.error)||'')+'<br>応答先頭：'+esc(String(raw).slice(0,160))+'</div>';
+      if(!retry){ setTimeout(()=>loadAlerts(true), 2500); return; }
+      if(wk0) wk0.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">天気を取得できませんでした。通信状況を確認して、画面を開き直すと再取得します。</div>';
       return;
     }
     renderWeek(fc.daily);
     renderHours(fc.hourly);
-    SUM.daily=fc.daily; SUM.alerts=computeAlerts(fc.daily); renderSummary();
+    SUM.daily=fc.daily; SUM.alerts=computeAlerts(fc.daily); renderSummary(); renderTips();
     if(!bar) return;
     const al=SUM.alerts;
     if(!al.length){
@@ -3034,10 +3103,7 @@ async function loadAlerts(retry){
       '<div class="alert '+a.type+'"><span class="ai">'+a.icon+'</span>'+
       '<div><div class="at">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>'
     ).join('');
-  }catch(e){
-    const wk=document.getElementById('weekWx');
-    if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px;font-size:11px;color:#999">診断：通信に失敗しました。'+esc(String(e&&e.message||e))+'</div>';
-  }
+  }catch(e){ if(!retry){ setTimeout(()=>loadAlerts(true), 2500); } }
 }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 async function loadSummaryData(){
@@ -3064,7 +3130,7 @@ function renderSummary(){
     wx=wxIcon(d.precip&&d.precip[0], d.precip_prob&&d.precip_prob[0], d.snow&&d.snow[0])+
        ' 最高'+Math.round((d.tmax&&d.tmax[0])||0)+'/最低'+Math.round((d.tmin&&d.tmin[0])||0)+'℃'+
        ' ☂'+((d.precip_prob&&d.precip_prob[0]!=null)?d.precip_prob[0]:'–')+'%'+
-       ' 風'+Math.round((d.wind&&d.wind[0])||0)+'m/s';
+       ((d.wind&&d.wind[0]!=null)?(' 風'+Math.round(d.wind[0])+'m/s'):'');
   }
   const spT=SUM.plans.filter(p=>p['予定日']===td), spO=SUM.plans.filter(p=>p['予定日']<td);
   const wkT=SUM.wplans.filter(p=>p['予定日']===td), wkO=SUM.wplans.filter(p=>p['予定日']<td);
@@ -3166,7 +3232,7 @@ function renderWeek(dl){
       '<div class="wic">'+wxIcon(dl.precip&&dl.precip[i], dl.precip_prob&&dl.precip_prob[i], dl.snow&&dl.snow[i])+'</div>'+
       '<div class="wtemp"><b>'+Math.round((dl.tmax&&dl.tmax[i])||0)+'</b>/<span>'+Math.round((dl.tmin&&dl.tmin[i])||0)+'</span></div>'+
       '<div class="wpop">☂'+pp+'%</div>'+
-      '<div class="wwind">'+Math.round((dl.wind&&dl.wind[i])||0)+'m/s</div>'+
+      '<div class="wwind">'+((dl.wind&&dl.wind[i]!=null)?(Math.round(dl.wind[i])+'m/s'):'')+'</div>'+
     '</div>';
   }
   h+='</div>';
@@ -3200,6 +3266,7 @@ async function loadGrowing(){
   }
   renderGrowBox(); markGrowing();
   renderSummary();
+  renderTips();
 }
 function openGrowEdit(){
   const sel=new Set(GROWING);
