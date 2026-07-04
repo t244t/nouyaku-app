@@ -3015,7 +3015,8 @@ function computeTips(dl){
 }
 function renderTips(){
   const box=document.getElementById('tipsBar'); if(!box) return;
-  const tips=computeTips(SUM.daily||{});
+  let tips=[];
+  try{ tips=computeTips((typeof SUM!=='undefined'&&SUM.daily)?SUM.daily:{}); }catch(e){ tips=[]; }
   if(!tips.length){ box.innerHTML=''; return; }
   // 最大2件（獣害・天気を優先、最後に定期を1つ）
   const priority=tips.filter(function(x){ return x.type!=='pt-check'; }).slice(0,2);
@@ -3238,6 +3239,7 @@ function renderWeek(dl){
   h+='</div>';
   box.innerHTML=h;
 }
+try{ renderTips(); }catch(e){}
 loadAlerts();
 loadSummaryData();
 
