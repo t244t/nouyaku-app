@@ -3006,13 +3006,18 @@ function computeAlerts(dl){
   return al;
 }
 let SUM={daily:null, alerts:[], plans:[], wplans:[], cal:[], plantings:[]};
-async function loadAlerts(){
+async function loadAlerts(retry){
   const bar=document.getElementById('alertBar');
   if(!CONFIG.GAS_URL) return;
   try{
     const res=await fetch(CONFIG.GAS_URL+'?action=forecast');
     const fc=await res.json();
-    if(!fc||!fc.daily) return;
+    if(!fc||!fc.daily){
+      if(!retry){ setTimeout(()=>loadAlerts(true), 2500); return; } // 一度だけ自動再取得
+      const wk=document.getElementById('weekWx');
+      if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">天気を取得できませんでした。通信状況を確認して、画面を開き直すと再取得します。</div>';
+      return;
+    }
     renderWeek(fc.daily);
     renderHours(fc.hourly);
     SUM.daily=fc.daily; SUM.alerts=computeAlerts(fc.daily); renderSummary();
@@ -3026,7 +3031,7 @@ async function loadAlerts(){
       '<div class="alert '+a.type+'"><span class="ai">'+a.icon+'</span>'+
       '<div><div class="at">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>'
     ).join('');
-  }catch(e){ /* 取得失敗時は非表示のまま */ }
+  }catch(e){ if(!retry){ setTimeout(()=>loadAlerts(true), 2500); } }
 }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 async function loadSummaryData(){
