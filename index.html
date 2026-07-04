@@ -3008,14 +3008,15 @@ function computeAlerts(dl){
 let SUM={daily:null, alerts:[], plans:[], wplans:[], cal:[], plantings:[]};
 async function loadAlerts(retry){
   const bar=document.getElementById('alertBar');
-  if(!CONFIG.GAS_URL) return;
+  if(!CONFIG.GAS_URL){ const wk=document.getElementById('weekWx'); if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">診断：GAS_URLが設定されていません。</div>'; return; }
   try{
     const res=await fetch(CONFIG.GAS_URL+'?action=forecast');
-    const fc=await res.json();
+    const raw=await res.text();
+    let fc=null; try{ fc=JSON.parse(raw); }catch(e){ fc=null; }
     if(!fc||!fc.daily){
-      if(!retry){ setTimeout(()=>loadAlerts(true), 2500); return; } // 一度だけ自動再取得
       const wk=document.getElementById('weekWx');
-      if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">天気を取得できませんでした。通信状況を確認して、画面を開き直すと再取得します。</div>';
+      if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div>'+
+        '<div class="note" style="padding:10px 4px;font-size:11px;color:#999;word-break:break-all">診断：天気データを取得できませんでした。<br>ok='+(fc?String(fc.ok):'なし')+' error='+esc((fc&&fc.error)||'')+'<br>応答先頭：'+esc(String(raw).slice(0,160))+'</div>';
       return;
     }
     renderWeek(fc.daily);
@@ -3031,7 +3032,10 @@ async function loadAlerts(retry){
       '<div class="alert '+a.type+'"><span class="ai">'+a.icon+'</span>'+
       '<div><div class="at">'+esc(a.title)+'</div><div>'+esc(a.msg)+'</div></div></div>'
     ).join('');
-  }catch(e){ if(!retry){ setTimeout(()=>loadAlerts(true), 2500); } }
+  }catch(e){
+    const wk=document.getElementById('weekWx');
+    if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px;font-size:11px;color:#999">診断：通信に失敗しました。'+esc(String(e&&e.message||e))+'</div>';
+  }
 }
 function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
 async function loadSummaryData(){
