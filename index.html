@@ -3008,7 +3008,9 @@ function computeAlerts(dl){
 let SUM={daily:null, alerts:[], plans:[], wplans:[], cal:[], plantings:[]};
 async function loadAlerts(retry){
   const bar=document.getElementById('alertBar');
-  if(!CONFIG.GAS_URL){ const wk=document.getElementById('weekWx'); if(wk) wk.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">診断：GAS_URLが設定されていません。</div>'; return; }
+  const wk0=document.getElementById('weekWx');
+  if(wk0 && !retry) wk0.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:8px 4px;color:#9bb0a0">天気を取得中…</div>';
+  if(!CONFIG.GAS_URL){ if(wk0) wk0.innerHTML='<div class="wxhead">週間天気（糸島）</div><div class="note" style="padding:10px 4px">診断：GAS_URLが設定されていません。</div>'; return; }
   try{
     const res=await fetch(CONFIG.GAS_URL+'?action=forecast');
     const raw=await res.text();
