@@ -261,6 +261,11 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #radarCtrl button{appearance:none;border:0;background:#1a5e9a;color:#fff;width:34px;height:34px;border-radius:50%;font-size:14px;cursor:pointer}
 #radarCtrl button:active{opacity:.85}
 #radarCtrl .rcnote{font-size:11.5px;color:var(--sub);font-weight:700;margin-left:4px}
+.rtag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:800;margin-left:5px;vertical-align:middle}
+.rtag-now{background:#1a5e9a;color:#fff}
+.rtag-past{background:#e7ebe2;color:var(--stem-dk)}
+.rtag-fc{background:#e6a700;color:#fff}
+#radarTime.rt-fc{color:#a87400}
 #polyBar .pbtitle{font-size:13.5px;font-weight:800;color:var(--stem-dk)}
 #polyBar .pbcount{margin-left:8px;font-size:12px;color:var(--soft);font-weight:700}
 #polyBar .pbmsg{font-size:12px;color:var(--sub);margin:4px 0 8px}
@@ -706,7 +711,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
     <button id="radarPrev" title="前のコマ">◀</button>
     <button id="radarPlay" title="再生／停止">▶</button>
     <button id="radarNext" title="次のコマ">▶</button>
-    <span class="rcnote">雨雲の動き（過去2時間〜この先30分予想）</span>
+    <span class="rcnote" id="radarNote">雨雲の動き（過去2時間〜予想）</span>
   </div>
   <div id="polyBar">
     <div class="pbtitle">区画を編集中：<b id="polyName"></b><span id="polyCount" class="pbcount"></span></div>
@@ -1652,7 +1657,7 @@ let radarOn=false, radarHost=null, radarFrames=null, baseLayer=null,
     radarPos=0, radarTimer=null, radarPlaying=false, radarLayerCache={}, radarNowIdx=0, radarFcCount=0;
 const ESRI_URL='https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const OSM_URL='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-function setRadarTime(s){ const e=document.getElementById('radarTime'); if(e) e.textContent=s; }
+
 /* 背景タイルをレイヤーごと作り直す（古いタイルを残さない） */
 function setBase(url){
   if(baseLayer){ try{ mapObj.removeLayer(baseLayer); }catch(e){} baseLayer=null; }
@@ -1675,6 +1680,15 @@ async function toggleRadar(force){
                    .concat(now.map(f=>({time:f.time,path:f.path,fc:true})));
         radarNowIdx=Math.max(0,past.length-1); // 「今」（最新の実測）の位置
         radarFcCount=now.length;
+        const note=document.getElementById('radarNote');
+        if(note){
+          if(now.length && past.length){
+            const fcMin=Math.round((now[now.length-1].time - past[past.length-1].time)/60);
+            note.textContent='雨雲の動き（過去2時間〜この先'+fcMin+'分予想）';
+          }else{
+            note.textContent='雨雲の動き（過去2時間・この先の予想は今は未配信）';
+          }
+        }
       }
       if(!radarFrames||!radarFrames.length){ toast('雨雲データがありません'); }
       else{
@@ -1704,6 +1718,7 @@ function getRadarLayer(f){
   radarLayerCache[f.path]=lyr;
   return lyr;
 }
+function setRadarTime(html){ const e=document.getElementById('radarTime'); if(e) e.innerHTML=html; }
 function showRadarFrame(i){
   if(!radarFrames||!radarFrames.length) return;
   radarPos=(i%radarFrames.length+radarFrames.length)%radarFrames.length;
@@ -1714,10 +1729,14 @@ function showRadarFrame(i){
   lyr.setOpacity(0.85);
   const dt=new Date(f.time*1000);
   const hh=('0'+dt.getHours()).slice(-2), mm=('0'+dt.getMinutes()).slice(-2);
-  let tag='';
-  if(f.fc) tag=' 予想';
-  else if(radarPos===radarNowIdx) tag=(radarFcCount>0?' 時点（今・▶で予想へ）':' 時点（今・予想データなし）');
+  const nowF=radarFrames[radarNowIdx];
+  const diffMin=nowF?Math.round((f.time-nowF.time)/60):0;
+  let tag='', cls='rt-past';
+  if(f.fc){ tag=' <span class="rtag rtag-fc">+'+diffMin+'分後・予想</span>'; cls='rt-fc'; }
+  else if(radarPos===radarNowIdx){ tag=(radarFcCount>0?' <span class="rtag rtag-now">実測（今）</span>':' <span class="rtag rtag-now">実測（今・予想データなし）</span>'); cls='rt-now'; }
+  else { tag=' <span class="rtag rtag-past">実測</span>'; cls='rt-past'; }
   setRadarTime('☁️ 雨雲 '+hh+':'+mm+tag);
+  const rt=document.getElementById('radarTime'); if(rt) rt.className='lg '+cls;
 }
 function radarPlay(){
   if(!radarFrames||radarFrames.length<2) return;
