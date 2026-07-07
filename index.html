@@ -104,6 +104,16 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .hwwrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 4px 10px 12px;box-shadow:var(--shadow)}
 .hwttl{font-size:12.5px;font-weight:800;color:var(--stem-dk);margin-bottom:8px}
 .hwrow{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.rcwrap{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 6px 10px 12px;box-shadow:var(--shadow);margin-top:10px}
+.rctop{display:flex;align-items:baseline;gap:8px;margin:0 4px 2px}
+.rcttl{font-size:12.5px;font-weight:800;color:var(--stem-dk)}
+.rcpeak{font-size:12px;color:var(--soft);margin-left:auto}
+.rcpeak b{color:var(--done-dk);font-weight:800}
+.rcsvg{width:100%;height:auto;display:block;margin-top:4px}
+.rcfoot{display:flex;align-items:center;gap:6px;margin:6px 6px 0;font-size:12px;color:var(--soft)}
+.rcsum{margin-left:auto;color:var(--ink);font-weight:700;display:flex;align-items:center;gap:5px}
+.rcdot{width:9px;height:9px;border-radius:50%;background:var(--done)}
+.rcnote{margin:6px 6px 0;font-size:11px;color:var(--soft);line-height:1.5}
 .hwcell{flex:0 0 auto;width:48px;text-align:center;border-radius:10px;padding:7px 3px;background:var(--paper);border:1px solid var(--line)}
 .hwcell.rain{background:#e8f0fa;border-color:#bcd5f0}
 .hwcell.rain2{background:#d6e6f7;border-color:#9ec3e8}
@@ -571,6 +581,8 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div id="weekWx"></div>
 
   <div id="hourWx"></div>
+
+  <div id="rainChart"></div>
 
   <div class="menu">
     <div class="eyebrow">防除・診断</div>
@@ -3112,6 +3124,7 @@ async function loadAlerts(retry){
     }
     renderWeek(fc.daily);
     renderHours(fc.hourly);
+    renderRainChart(fc.hourly);
     SUM.daily=fc.daily; SUM.alerts=computeAlerts(fc.daily); renderSummary(); renderTips();
     if(!bar) return;
     const al=SUM.alerts;
@@ -3237,6 +3250,62 @@ function renderHours(hr){
     '</div>';
   }
   box.innerHTML='<div class="hwwrap"><div class="hwttl">今日これからの雨（1時間ごと・24時間）</div><div class="hwrow">'+cells+'</div></div>';
+}
+function renderRainChart(hr){
+  const box=document.getElementById('rainChart');
+  if(!box) return;
+  if(!hr||!hr.time||!hr.time.length){ box.innerHTML=''; return; }
+  const T=hr.time, P=(hr.prob||[]).map(v=>Number(v||0)), R=(hr.precip||[]).map(v=>Number(v||0));
+  const n=T.length;
+  const VW=360,VH=196,pT=10,pB=24,pL=6,pR=40;
+  const L=pL,Rt=VW-pR,Tp=pT,Bt=VH-pB;
+  const X=i=> L+(i/Math.max(1,n-1))*(Rt-L);
+  const Y=p=> Bt-(Math.max(0,Math.min(100,p))/100)*(Bt-Tp);
+  const pts=P.map((p,i)=>({x:X(i),y:Y(p)}));
+  let line='M '+pts[0].x.toFixed(1)+' '+pts[0].y.toFixed(1);
+  for(let i=0;i<pts.length-1;i++){
+    const p0=pts[i-1]||pts[i],p1=pts[i],p2=pts[i+1],p3=pts[i+2]||p2;
+    const c1x=p1.x+(p2.x-p0.x)/6, c1y=Math.max(Tp,Math.min(Bt,p1.y+(p2.y-p0.y)/6));
+    const c2x=p2.x-(p3.x-p1.x)/6, c2y=Math.max(Tp,Math.min(Bt,p2.y-(p3.y-p1.y)/6));
+    line+=' C '+c1x.toFixed(1)+' '+c1y.toFixed(1)+', '+c2x.toFixed(1)+' '+c2y.toFixed(1)+', '+p2.x.toFixed(1)+' '+p2.y.toFixed(1);
+  }
+  const area=line+' L '+Rt+' '+Bt+' L '+L+' '+Bt+' Z';
+  let g='';
+  for(let v=0;v<=100;v+=20){
+    g+='<line x1="'+L+'" y1="'+Y(v)+'" x2="'+Rt+'" y2="'+Y(v)+'" stroke="var(--line)" stroke-width="1"/>';
+    g+='<text x="'+(Rt+6)+'" y="'+(Y(v)+3.4)+'" font-size="9.5" fill="var(--soft)">'+v+'%</text>';
+  }
+  let vx='';
+  for(let i=0;i<n;i++){
+    const hh=Number(T[i].slice(11,13));
+    const isNow=(i===0), sixth=(hh%6===0), midnight=(hh===0&&i>0);
+    if(isNow||sixth){
+      vx+='<line x1="'+X(i)+'" y1="'+Tp+'" x2="'+X(i)+'" y2="'+Bt+'" stroke="var(--line)" stroke-width="1" stroke-dasharray="2 4"/>';
+      vx+='<text x="'+X(i)+'" y="'+(Bt+15)+'" font-size="9.5" fill="var(--soft)" text-anchor="middle">'+(isNow?'今':(hh+'時'))+'</text>';
+    }
+    if(midnight){
+      vx+='<text x="'+X(i)+'" y="'+(Tp+9)+'" font-size="9" fill="var(--soft)" text-anchor="middle">'+T[i].slice(5,10).replace('-','/')+'</text>';
+    }
+  }
+  let pk=0,pi=0; P.forEach((p,i)=>{ if(p>pk){pk=p;pi=i;} });
+  const pkh=Number(T[pi].slice(11,13));
+  const sum=Math.round(R.reduce((a,b)=>a+b,0)*10)/10;
+  box.innerHTML=
+    '<div class="rcwrap">'+
+      '<div class="rctop"><span class="rcttl">降水確率（これから24時間）</span>'+
+        '<span class="rcpeak">最大 <b>'+Math.round(pk)+'%</b>'+(pk>=10?'（'+(pi===0?'今':pkh+'時')+'ごろ）':'')+'</span></div>'+
+      '<svg class="rcsvg" viewBox="0 0 '+VW+' '+VH+'" role="img" aria-label="これから24時間の降水確率">'+
+        '<defs><linearGradient id="rcg" x1="0" y1="0" x2="0" y2="1">'+
+          '<stop offset="0" stop-color="rgba(0,180,216,.30)"/><stop offset="1" stop-color="rgba(0,180,216,0)"/>'+
+        '</linearGradient></defs>'+
+        g+vx+
+        '<path d="'+area+'" fill="url(#rcg)"/>'+
+        '<path d="'+line+'" fill="none" stroke="var(--done)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>'+
+      '</svg>'+
+      '<div class="rcfoot"><span>1時間ごとの推移</span>'+
+        '<span class="rcsum"><span class="rcdot"></span>総雨量 '+sum+'mm</span></div>'+
+      '<div class="rcnote">日別の降水確率は1時間ごとより高めに出る傾向があります（その日のどこかで降る可能性を示すため）。</div>'+
+    '</div>';
 }
 function renderWeek(dl){
   const box=document.getElementById('weekWx'); if(!box||!dl||!dl.time) return;
