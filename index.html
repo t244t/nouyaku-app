@@ -3327,7 +3327,56 @@ function renderHours(hr, cur){
       ? '<div class="hwcur hwcur-rain">☔ 現在の実況：雨が観測されています（'+(cur.precip!=null?cur.precip+'mm/h':'')+'）</div>'
       : '<div class="hwcur hwcur-dry">☀️ 現在の実況：雨は観測されていません（予報の確率とは別の、その場の実況です）</div>';
   }
-  box.innerHTML='<div class="hwwrap"><div class="hwttl">今日これからの雨（1時間ごと・24時間）</div>'+curLine+'<div class="hwrow">'+cells+'</div></div>';
+  const graph=renderPrecipGraph(hr);
+  box.innerHTML='<div class="hwwrap"><div class="hwttl">今日これからの雨（1時間ごと・24時間）</div>'+curLine+'<div class="hwrow">'+cells+'</div></div>'+graph;
+}
+function renderPrecipGraph(hr){
+  const t=hr.time||[], prob=hr.prob||[], precip=hr.precip||[];
+  const n=t.length; if(!n) return '';
+  const W=Math.max(560, n*46), H=150, padL=28, padR=14, padT=18, padB=26;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const stepX=n>1?plotW/(n-1):0;
+  let maxProb=0, maxIdx=0, totalMm=0;
+  for(let i=0;i<n;i++){
+    const p=prob[i]!=null?prob[i]:0;
+    if(p>maxProb){ maxProb=p; maxIdx=i; }
+    totalMm+=(precip[i]!=null?precip[i]:0);
+  }
+  const y=p=>padT+plotH-(Math.max(0,Math.min(100,p))/100*plotH);
+  let path='', pts='';
+  for(let i=0;i<n;i++){
+    const x=padL+i*stepX, yy=y(prob[i]!=null?prob[i]:0);
+    path += (i===0?'M':'L')+x.toFixed(1)+' '+yy.toFixed(1)+' ';
+    if(i%2===0||i===n-1||i===maxIdx){
+      pts += '<circle cx="'+x.toFixed(1)+'" cy="'+yy.toFixed(1)+'" r="2.6" fill="#2f8fd6"/>';
+      pts += '<text x="'+x.toFixed(1)+'" y="'+(yy-8).toFixed(1)+'" font-size="10" text-anchor="middle" fill="#5b7a94">'+(prob[i]!=null?prob[i]:0)+'</text>';
+    }
+  }
+  let xlabels='';
+  for(let i=0;i<n;i+=2){
+    const x=padL+i*stepX; const hh=Number(String(t[i]).slice(11,13));
+    xlabels += '<text x="'+x.toFixed(1)+'" y="'+(H-8)+'" font-size="10" text-anchor="middle" fill="#8a9a90">'+(i===0?'今':hh+'時')+'</text>';
+  }
+  const gridY=[0,25,50,75,100].map(v=>'<line x1="'+padL+'" x2="'+(W-padR)+'" y1="'+y(v).toFixed(1)+'" y2="'+y(v).toFixed(1)+'" stroke="#e6ebe3" stroke-width="1"/>'+
+    '<text x="4" y="'+(y(v)+3).toFixed(1)+'" font-size="9" fill="#9aa89f">'+v+'</text>').join('');
+  const areaPath = path + 'L'+(padL+(n-1)*stepX).toFixed(1)+' '+(padT+plotH)+' L'+padL+' '+(padT+plotH)+' Z';
+  const hhMax=Number(String(t[maxIdx]).slice(11,13));
+  const svg='<svg viewBox="0 0 '+W+' '+H+'" width="'+W+'" height="'+H+'" style="display:block">'+
+    gridY+'<path d="'+areaPath+'" fill="#2f8fd6" fill-opacity="0.08"/>'+
+    '<path d="'+path+'" fill="none" stroke="#2f8fd6" stroke-width="2"/>'+
+    pts+xlabels+'</svg>';
+  return '<div class="hwwrap" style="margin-top:10px">'+
+    '<div class="hwttl" style="display:flex;justify-content:space-between;align-items:baseline">'+
+      '<span>降水確率（これから24時間・1時間ごと）</span>'+
+      '<span style="font-size:11px;color:var(--sub);font-weight:700">最大 <b style="color:#2f8fd6">'+maxProb+'%</b>（'+(maxIdx===0?'今':hhMax+'時ごろ')+'）</span>'+
+    '</div>'+
+    '<div style="overflow-x:auto;-webkit-overflow-scrolling:touch">'+svg+'</div>'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">'+
+      '<span style="font-size:10.5px;color:var(--soft)">← 横スクロールで先の時間へ</span>'+
+      '<span style="font-size:11px;color:var(--sub);font-weight:700">💧 総雨量 '+(Math.round(totalMm*10)/10)+'mm</span>'+
+    '</div>'+
+    '<div style="font-size:10px;color:var(--soft);margin-top:2px">数字は各時刻の降水確率です。日別の確率は1時間ごとより高めに出る傾向があります。</div>'+
+  '</div>';
 }
 function renderWeek(dl){
   const box=document.getElementById('weekWx'); if(!box||!dl||!dl.time) return;
