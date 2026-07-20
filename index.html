@@ -287,6 +287,9 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #whBody{padding:8px 10px 40px}
 #toolView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #toolView.show{display:flex}
+#diagHistView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
+#diagHistView.show{display:flex}
+#diagHistBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
 #stockView{position:fixed;inset:0;z-index:900;background:var(--paper);display:none;flex-direction:column}
 #stockView.show{display:flex}
 #stockBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
@@ -582,6 +585,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
         <span>写真で診断</span>
       </button>
+      <button class="tile" id="openDiagHist">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/><path d="M21 15l-5-5L5 21"/></svg>
+        <span>診断履歴</span>
+      </button>
       <button class="tile" id="openAdvisor">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></svg>
         <span>AIに相談</span>
@@ -865,6 +872,15 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   <div class="callegend"><span style="color:var(--soft)">肥料の在庫一覧です。タップで詳細・編集ができます。</span></div>
   <div id="fertFilter" class="toolfilter"></div>
   <div id="fertBody" class="calbody"></div>
+</div>
+
+<div id="diagHistView">
+  <div class="calhead">
+    <h2>診断履歴</h2>
+    <button class="mclose" id="diagHistCloseBtn">閉じる</button>
+  </div>
+  <div class="callegend"><span style="color:var(--soft)">写真で診断した記録です。タップで詳細が見られます。</span></div>
+  <div id="diagHistBody" class="calbody"></div>
 </div>
 
 <div id="stockView">
@@ -2664,6 +2680,70 @@ function calcDilute(){
     '<div class="rsub">＋ 水 約'+waterL+' L（合計 '+vol+'L）</div>'+
     '<div class="rsub" style="margin-top:6px;color:#9a7a00">液剤は mL、粒剤・水和剤は g として読み替え</div>';
 }
+/* ============== 診断履歴 ============== */
+let diagHistList=[];
+async function openDiagHist(){
+  document.getElementById('diagHistView').classList.add('show');
+  document.getElementById('diagHistBody').innerHTML='<div class="note" style="padding:16px">読み込み中…</div>';
+  await loadDiagHist();
+  renderDiagHist();
+}
+async function loadDiagHist(){
+  diagHistList=[];
+  if(!CONFIG.GAS_URL) return;
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listDiagnoses&limit=100')).json();
+    diagHistList=(j&&j.records)?j.records:[]; }catch(e){ diagHistList=[]; }
+}
+function renderDiagHist(){
+  const box=document.getElementById('diagHistBody'); if(!box) return;
+  if(!diagHistList.length){ box.innerHTML='<div class="note" style="padding:16px">まだ診断履歴がありません。「写真で診断」を使うと、ここに記録されます。</div>'; return; }
+  box.innerHTML=diagHistList.map(function(r,idx){
+    const img=driveImg(r['画像URL']||'');
+    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="" width="116" height="92">'):'<span class="ph">🔍</span>')+'</div>';
+    const d=String(r['登録日時']||'').slice(0,16).replace('T',' ');
+    const top=r['候補名1']||'（結果なし）';
+    const conf=r['確信度1']?('確信度：'+r['確信度1']):'';
+    return '<div class="tcard" onclick="openDiagHistDetail('+idx+')">'+imgHtml+
+      '<div class="tin"><div class="tnm">'+esc(r['作物']||'')+'　'+esc(top)+'</div>'+
+      '<div class="tmeta">'+esc(d)+(r['部位']?('　部位：'+esc(r['部位'])):'')+'</div>'+
+      (conf?'<div class="tmeta">'+esc(conf)+'</div>':'')+
+      '</div></div>';
+  }).join('');
+}
+function openDiagHistDetail(idx){
+  const r=diagHistList[idx]; if(!r) return;
+  const img=driveImg(r['画像URL']||'');
+  let html='<div class="fh"><div class="nm">診断履歴の詳細</div></div>';
+  if(img) html+='<img src="'+img+'" alt="" style="width:100%;border-radius:12px;margin-bottom:10px">';
+  html+='<div class="dgcand"><div class="nm">'+esc(r['作物']||'')+(r['部位']?('　'+esc(r['部位'])):'')+'</div>';
+  const d=String(r['登録日時']||'').slice(0,16).replace('T',' ');
+  html+='<div class="lab">日時</div><div class="val">'+esc(d)+'</div>';
+  if(r['メモ']) html+='<div class="lab">メモ</div><div class="val">'+esc(r['メモ'])+'</div>';
+  html+='</div>';
+  [1,2,3].forEach(function(i){
+    const nm=r['候補名'+i];
+    if(!nm) return;
+    html+='<div class="dgcand"><div class="nm">'+esc(nm)+'　<span class="tst 使用中">確信度：'+esc(r['確信度'+i]||'')+'</span></div></div>';
+  });
+  if(r['AIメモ']) html+='<div class="dgcand"><div class="lab">AIからの補足</div><div class="val">'+esc(r['AIメモ'])+'</div></div>';
+  html+='<button class="save" id="dgh_del" style="background:#fff;color:#b3261e;border:1px solid #e6b4ae;margin-top:8px">この記録を削除</button>';
+  const sh=document.getElementById('fSheetIn'); if(!sh) return;
+  sh.innerHTML=html;
+  document.getElementById('fScrim').classList.add('show');
+  document.getElementById('fSheet').classList.add('show');
+  document.getElementById('fSheet').scrollTop=0;
+  document.getElementById('dgh_del').onclick=()=>deleteDiagHistItem(r['診断ID']);
+}
+async function deleteDiagHistItem(id){
+  if(!id) return;
+  if(!confirm('この診断記録を削除します。よろしいですか？\n（この操作は取り消せません）')) return;
+  if(!CONFIG.GAS_URL){ toast('GAS未接続です'); return; }
+  try{
+    const j=await (await fetch(CONFIG.GAS_URL+'?action=deleteDiagnosis&'+new URLSearchParams({id:id}))).json();
+    if(j&&j.ok){ toast('削除しました'); closeFieldSheet(); await loadDiagHist(); renderDiagHist(); }
+    else toast('削除に失敗しました：'+esc((j&&j.error)||''));
+  }catch(e){ toast('削除に失敗しました。通信を確認してください'); }
+}
 /* ============== 農薬在庫 ============== */
 const STOCK_CATS=['除草剤','殺菌剤','殺虫剤'];
 const STOCK_UNITS=['本','袋','缶','箱','kg','g','L','mL'];
@@ -2951,6 +3031,8 @@ document.getElementById('typhoonReload').onclick=loadTyphoon;
 document.getElementById('fertCloseBtn').onclick=()=>document.getElementById('fertView').classList.remove('show');
 document.getElementById('fertAddBtn').onclick=()=>openFertForm(null);
 document.getElementById('openStock').onclick=openStock;
+document.getElementById('openDiagHist').onclick=openDiagHist;
+document.getElementById('diagHistCloseBtn').onclick=()=>document.getElementById('diagHistView').classList.remove('show');
 document.getElementById('openDilute').onclick=openDilute;
 document.getElementById('openAdvisor').onclick=openAdvisor;
 document.getElementById('advisorCloseBtn').onclick=()=>document.getElementById('advisorView').classList.remove('show');
