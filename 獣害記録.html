@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>獣害記録｜農・みのり</title>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --danger:#B3261E; --danger-bg:#FBEDEC;
+  --warn:#9A6B00; --warn-bg:#FBF3DC;
+  --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  background:var(--paper);color:var(--ink);line-height:1.55;font-feature-settings:"palt";
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:480px;margin:0 auto;padding:0 14px 96px;min-height:100vh}
+header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand h1{font-size:17px;margin:0;letter-spacing:.04em;font-weight:800}
+.brand .sub{font-size:11px;color:var(--soft);letter-spacing:.08em}
+.back{display:inline-block;margin-top:6px;font-size:12px;color:var(--stem-dk);text-decoration:none}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--soft);font-weight:700;margin:18px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:var(--shadow)}
+label{display:block;font-size:12px;color:var(--soft);font-weight:700;margin:10px 0 4px}
+input,select,textarea{width:100%;font:inherit;font-size:15px;padding:9px 10px;border:1px solid var(--line);
+  border-radius:10px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;
+  font-weight:700;color:var(--soft);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--stem);border-color:var(--stem);color:#fff}
+.chip.sev[aria-pressed="true"]{background:var(--danger);border-color:var(--danger)}
+.btn{width:100%;margin-top:16px;padding:13px;border:0;border-radius:12px;background:var(--stem);color:#fff;
+  font-size:15px;font-weight:800;cursor:pointer}
+.btn:disabled{opacity:.5}
+.note{font-size:11px;color:var(--soft);margin-top:8px;line-height:1.5}
+.rec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;margin-bottom:8px}
+.rec .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.rec .d{font-size:12px;color:var(--soft);font-weight:700}
+.rec .sv{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF2EC;color:var(--soft)}
+.rec .sv.bad{background:var(--danger-bg);color:var(--danger)}
+.rec .sv.mid{background:var(--warn-bg);color:var(--warn)}
+.rec .main{font-size:14px;font-weight:700;margin-top:3px}
+.rec .sub{font-size:12px;color:var(--soft);margin-top:2px}
+.empty{text-align:center;color:var(--soft);font-size:13px;padding:22px 10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18231A;color:#fff;
+  padding:10px 18px;border-radius:999px;font-size:13px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.95}
+.sum{display:flex;gap:8px;margin-bottom:10px}
+.sum div{flex:1;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px;text-align:center}
+.sum b{display:block;font-size:19px;color:var(--stem-dk)}
+.sum span{font-size:11px;color:var(--soft)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span>🦝</span><h1>獣害記録</h1><span class="sub">農・みのり</span></div>
+    <a class="back" href="index.html">← ホームへ戻る</a>
+  </header>
+
+  <div class="eyebrow">被害を記録する</div>
+  <div class="card">
+    <label for="d">発生日（気づいた日）</label>
+    <input type="date" id="d">
+
+    <div class="row">
+      <div><label for="f">圃場</label><select id="f"></select></div>
+      <div><label for="c">作物</label><select id="c"></select></div>
+    </div>
+
+    <label>獣種</label>
+    <div class="chips" id="animals"></div>
+
+    <label>被害程度</label>
+    <div class="chips" id="sev"></div>
+
+    <div class="row">
+      <div><label for="amt">被害量</label><input type="number" id="amt" inputmode="decimal" placeholder="数量"></div>
+      <div><label for="unit">単位</label><select id="unit">
+        <option>株</option><option>㎡</option><option>畝</option><option>a</option><option>本</option>
+      </select></div>
+    </div>
+
+    <label for="loss">推定損失額（任意・円）</label>
+    <input type="number" id="loss" inputmode="numeric" placeholder="わかる範囲で">
+
+    <label>被害時の防護状況</label>
+    <div class="chips" id="guard"></div>
+
+    <label for="photo">写真（複数可）</label>
+    <input type="file" id="photo" accept="image/*" multiple>
+
+    <label for="memo">メモ</label>
+    <textarea id="memo" placeholder="侵入経路、食べられ方、足跡の有無など"></textarea>
+
+    <button class="btn" id="save">この被害を記録する</button>
+    <div class="note">写真は補助金や柵の貸与申請で求められることがあります。被害箇所の全体と、食害の様子がわかる寄りの2枚があると確実です。</div>
+  </div>
+
+  <div class="eyebrow">これまでの記録</div>
+  <div class="sum" id="sum" style="display:none"></div>
+  <div id="list"><div class="empty">読み込み中…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec",
+  LIFF_ID: "",
+  LINE_USER: "Uf760e5551fafc369a0a2527dc30cf563"
+};
+const RECORDER = 'あにき';
+const FIELDS = ["ねぎ前上","ねぎ前下","ねぎ横畑","ねぎ横畑先","みかん山","羽根戸田んぼ","西貝塚畑"];
+const CROPS = ["お米","なす","きゅうり","キャベツ","じゃがいも","スナップエンドウ","さつまいも","オクラ",
+  "トウモロコシ","ピーマン","トマト","落花生","レタス","ししとう","ホウレン草","にんにく","人参","玉ねぎ",
+  "カボチャ","スイカ","メロン","冬瓜","だいこん","かぶ","ラディッシュ","こまつな","みずな","かつお菜",
+  "白菜","ブロッコリー","カリフラワー","里芋","春菊","ねぎ"];
+const ANIMALS = ["アライグマ","イノシシ","シカ","サル","カラス","ハクビシン","アナグマ","ヒヨドリ","不明"];
+const SEVERITY = ["軽微","部分","甚大","全滅"];
+const GUARDS = ["なし","電気柵","ネット","囲い","防鳥ネット","その他"];
+
+const $ = id => document.getElementById(id);
+let pick = {獣種:'', 被害程度:'', 防護状況:'なし'};
+
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2600); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---- フォーム構築 ---- */
+$('d').value = new Date().toISOString().slice(0,10);
+FIELDS.forEach(v=>$('f').insertAdjacentHTML('beforeend','<option>'+esc(v)+'</option>'));
+$('c').insertAdjacentHTML('beforeend','<option value="">（選択）</option>');
+CROPS.forEach(v=>$('c').insertAdjacentHTML('beforeend','<option>'+esc(v)+'</option>'));
+
+function buildChips(boxId, list, key, cls){
+  const box=$(boxId);
+  list.forEach(v=>{
+    const b=document.createElement('button');
+    b.type='button'; b.className='chip'+(cls?' '+cls:''); b.textContent=v;
+    b.setAttribute('aria-pressed', pick[key]===v ? 'true':'false');
+    b.onclick=()=>{
+      pick[key]=v;
+      [...box.children].forEach(x=>x.setAttribute('aria-pressed','false'));
+      b.setAttribute('aria-pressed','true');
+    };
+    box.appendChild(b);
+  });
+}
+buildChips('animals', ANIMALS, '獣種');
+buildChips('sev', SEVERITY, '被害程度', 'sev');
+buildChips('guard', GUARDS, '防護状況');
+
+/* ---- 写真（保存時にリサイズしてPOST） ---- */
+let pendingPhotos = [];
+$('photo').onchange = async e => {
+  pendingPhotos = [];
+  for(const file of e.target.files){
+    const dataUrl = await shrink(file);
+    if(dataUrl) pendingPhotos.push({name:file.name, mime:'image/jpeg', dataUrl});
+  }
+  if(pendingPhotos.length) toast('写真'+pendingPhotos.length+'枚を添付しました');
+};
+function shrink(file){
+  return new Promise(res=>{
+    const url=URL.createObjectURL(file), img=new Image();
+    img.onload=()=>{
+      const M=1280, s=Math.min(1, M/Math.max(img.width,img.height));
+      const w=Math.round(img.width*s), h=Math.round(img.height*s);
+      const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      let out=null; try{ out=cv.toDataURL('image/jpeg',0.85); }catch(_){}
+      URL.revokeObjectURL(url); res(out);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); res(null); };
+    img.src=url;
+  });
+}
+async function uploadPhotos(recordId){
+  if(!pendingPhotos.length) return;
+  for(const ph of pendingPhotos){
+    try{
+      await fetch(CONFIG.GAS_URL,{method:'POST',
+        body:JSON.stringify({action:'uploadPhoto',記録ID:recordId,種別:'獣害',
+          ファイル名:ph.name,mimeType:ph.mime,dataB64:ph.dataUrl})});
+    }catch(e){}
+  }
+  pendingPhotos=[];
+}
+
+/* ---- 保存 ---- */
+$('save').onclick = async () => {
+  if(!pick.獣種){ toast('獣種を選んでください'); return; }
+  if(!pick.被害程度){ toast('被害程度を選んでください'); return; }
+  if(!$('c').value){ toast('作物を選んでください'); return; }
+  const rec = {
+    line_user:CONFIG.LINE_USER, 記録者:RECORDER,
+    発生日:$('d').value, 圃場:$('f').value, 作物:$('c').value,
+    獣種:pick.獣種, 被害程度:pick.被害程度,
+    被害量:$('amt').value, 単位:$('unit').value,
+    推定損失額:$('loss').value, 防護状況:pick.防護状況, メモ:$('memo').value
+  };
+  const btn=$('save'); btn.disabled=true; btn.textContent='保存中…';
+  try{
+    const url=CONFIG.GAS_URL+'?action=addBeast&'+new URLSearchParams(rec).toString();
+    const j=await (await fetch(url)).json();
+    if(!j || !j.ok) throw 0;
+    const n=pendingPhotos.length;
+    if(n){ toast('記録しました。写真'+n+'枚を保存中…'); await uploadPhotos(j.id); toast('写真'+n+'枚を保存しました'); }
+    else { toast('記録しました'); }
+    $('amt').value=''; $('loss').value=''; $('memo').value=''; $('photo').value='';
+    load();
+  }catch(e){
+    toast('保存に失敗しました。通信を確認してください');
+  }finally{
+    btn.disabled=false; btn.textContent='この被害を記録する';
+  }
+};
+
+/* ---- 一覧 ---- */
+async function load(){
+  try{
+    const j = await (await fetch(CONFIG.GAS_URL+'?action=listBeast&limit=60')).json();
+    const items = (j && j.items) || [];
+    if(!items.length){ $('list').innerHTML='<div class="empty">まだ記録がありません。<br>被害に気づいたら、その日のうちに残しておくと後で効きます。</div>'; return; }
+
+    const yr = new Date().getFullYear();
+    const thisYear = items.filter(r=>String(r.発生日).slice(0,4)==String(yr));
+    const loss = thisYear.reduce((s,r)=>s+(Number(r.推定損失額)||0),0);
+    const kinds = new Set(thisYear.map(r=>r.獣種));
+    $('sum').style.display='flex';
+    $('sum').innerHTML =
+      '<div><b>'+thisYear.length+'</b><span>今年の件数</span></div>'+
+      '<div><b>'+kinds.size+'</b><span>獣種</span></div>'+
+      '<div><b>'+(loss?loss.toLocaleString():'—')+'</b><span>推定損失(円)</span></div>';
+
+    $('list').innerHTML = items.map(r=>{
+      const sv=r.被害程度, cls = sv==='全滅'?'bad' : (sv==='甚大'||sv==='部分')?'mid':'';
+      const qty = r.被害量 ? (' ・ '+esc(r.被害量)+esc(r.単位)) : '';
+      const g = r.防護状況 && r.防護状況!=='なし' ? ('防護：'+esc(r.防護状況)) : '防護なし';
+      return '<div class="rec">'+
+        '<div class="top"><span class="d">'+esc(r.発生日)+'</span>'+
+          '<span class="sv '+cls+'">'+esc(sv||'—')+'</span></div>'+
+        '<div class="main">'+esc(r.獣種)+' / '+esc(r.作物)+'（'+esc(r.圃場)+'）'+qty+'</div>'+
+        '<div class="sub">'+g+(r.メモ?' ・ '+esc(r.メモ):'')+'</div>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    $('list').innerHTML='<div class="empty">記録を読み込めませんでした。<br><small>GASの再デプロイは済んでいますか？</small></div>';
+  }
+}
+load();
+</script>
+</body>
+</html>
