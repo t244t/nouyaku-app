@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>やることメモ｜農・みのり</title>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --danger:#B3261E; --danger-bg:#FBEDEC;
+  --warn:#9A6B00; --warn-bg:#FBF3DC;
+  --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  background:var(--paper);color:var(--ink);line-height:1.55;font-feature-settings:"palt";
+  -webkit-font-smoothing:antialiased}
+.wrap{max-width:480px;margin:0 auto;padding:0 14px 120px;min-height:100vh}
+header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand h1{font-size:17px;margin:0;letter-spacing:.04em;font-weight:800}
+.brand .sub{font-size:11px;color:var(--soft);letter-spacing:.08em}
+.back{display:inline-block;margin-top:6px;font-size:12px;color:var(--stem-dk);text-decoration:none}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--soft);font-weight:700;margin:18px 0 8px;
+  display:flex;justify-content:space-between;align-items:center}
+.eyebrow a{font-size:11px;color:var(--stem-dk);text-decoration:none;letter-spacing:0}
+.quick{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow)}
+.quick input[type=text]{width:100%;font:inherit;font-size:16px;padding:11px 12px;border:1px solid var(--line);
+  border-radius:10px;background:#fff}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font-size:13px;
+  font-weight:700;color:var(--soft);cursor:pointer}
+.chip[aria-pressed="true"]{background:var(--stem);border-color:var(--stem);color:#fff}
+.quick .btn{width:100%;margin-top:10px;padding:12px;border:0;border-radius:12px;background:var(--stem);
+  color:#fff;font-size:15px;font-weight:800;cursor:pointer}
+.quick .btn:disabled{opacity:.5}
+.sel{width:100%;font:inherit;font-size:14px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;
+  margin-top:8px;background:#fff;color:var(--ink)}
+.item{display:flex;gap:10px;align-items:flex-start;background:var(--card);border:1px solid var(--line);
+  border-radius:12px;padding:11px 12px;margin-bottom:8px}
+.item.over{border-color:#EBC9C6;background:var(--danger-bg)}
+.item.today{border-color:#EAD9A8;background:var(--warn-bg)}
+.item.done{opacity:.5}
+.box{flex:0 0 auto;width:24px;height:24px;border:2px solid var(--stem);border-radius:7px;background:#fff;
+  cursor:pointer;display:grid;place-items:center;margin-top:1px}
+.box.on{background:var(--stem)}
+.box svg{width:14px;height:14px;stroke:#fff;stroke-width:3;fill:none;display:none}
+.box.on svg{display:block}
+.body{flex:1;min-width:0}
+.txt{font-size:15px;font-weight:700;word-break:break-word}
+.item.done .txt{text-decoration:line-through}
+.meta{font-size:11.5px;color:var(--soft);margin-top:3px}
+.meta .od{color:var(--danger);font-weight:800}
+.meta .td{color:var(--warn);font-weight:800}
+.del{flex:0 0 auto;border:0;background:none;color:var(--soft);font-size:18px;line-height:1;cursor:pointer;padding:2px 4px}
+.empty{text-align:center;color:var(--soft);font-size:13px;padding:26px 10px}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18231A;color:#fff;
+  padding:10px 18px;border-radius:999px;font-size:13px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span>📝</span><h1>やることメモ</h1><span class="sub">農・みのり</span></div>
+    <a class="back" href="index.html">← ホームへ戻る</a>
+  </header>
+
+  <div class="eyebrow">思いついたら、すぐ</div>
+  <div class="quick">
+    <input type="text" id="t" placeholder="例：ねぎ横畑の電気柵を点検" enterkeyhint="done">
+    <div class="chips" id="due"></div>
+    <select class="sel" id="f"></select>
+    <button class="btn" id="add">追加する</button>
+  </div>
+
+  <div class="eyebrow"><span>やること</span><a href="#" id="toggle">完了分も表示</a></div>
+  <div id="list"><div class="empty">読み込み中…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec",
+  LINE_USER: "Uf760e5551fafc369a0a2527dc30cf563"
+};
+const RECORDER = 'あにき';
+const FIELDS = ["ねぎ前上","ねぎ前下","ねぎ横畑","ねぎ横畑先","みかん山","羽根戸田んぼ","西貝塚畑"];
+
+const $ = id => document.getElementById(id);
+let duePick = '', showAll = false;
+
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2400); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function ymd(d){ return d.toISOString().slice(0,10); }
+function today(){ return ymd(new Date()); }
+function plus(n){ const d=new Date(); d.setDate(d.getDate()+n); return ymd(d); }
+
+/* 期限チップ */
+const DUES = [['なし',''],['今日',()=>today()],['明日',()=>plus(1)],['今週',()=>plus(7)]];
+DUES.forEach(([label,val])=>{
+  const b=document.createElement('button');
+  b.type='button'; b.className='chip'; b.textContent=label;
+  b.setAttribute('aria-pressed', label==='なし'?'true':'false');
+  b.onclick=()=>{
+    duePick = typeof val==='function' ? val() : '';
+    [...$('due').children].forEach(x=>x.setAttribute('aria-pressed','false'));
+    b.setAttribute('aria-pressed','true');
+  };
+  $('due').appendChild(b);
+});
+
+$('f').innerHTML = '<option value="">圃場（任意）</option>' +
+  FIELDS.map(v=>'<option>'+esc(v)+'</option>').join('');
+
+/* 追加 */
+async function add(){
+  const text = $('t').value.trim();
+  if(!text){ $('t').focus(); return; }
+  const btn=$('add'); btn.disabled=true; btn.textContent='追加中…';
+  try{
+    const q = new URLSearchParams({内容:text, 期限:duePick, 圃場:$('f').value,
+      記録者:RECORDER, line_user:CONFIG.LINE_USER});
+    const j = await (await fetch(CONFIG.GAS_URL+'?action=addTodo&'+q.toString())).json();
+    if(!j || !j.ok) throw 0;
+    $('t').value=''; toast('追加しました'); load();
+  }catch(e){ toast('追加できませんでした'); }
+  finally{ btn.disabled=false; btn.textContent='追加する'; }
+}
+$('add').onclick = add;
+$('t').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } });
+
+/* 一覧 */
+async function load(){
+  try{
+    const j = await (await fetch(CONFIG.GAS_URL+'?action=listTodo'+(showAll?'&all=1':''))).json();
+    const items = (j && j.items) || [];
+    if(!items.length){
+      $('list').innerHTML = '<div class="empty">' +
+        (showAll ? 'まだ記録がありません。' : 'やることはありません。<br>思いついたら上に書き足してください。') +
+        '</div>';
+      return;
+    }
+    const td = today();
+    $('list').innerHTML = items.map(it=>{
+      const done = it.状態==='済';
+      const over = !done && it.期限 && it.期限 < td;
+      const now  = !done && it.期限 === td;
+      let meta = [];
+      if(over) meta.push('<span class="od">期限すぎ '+esc(it.期限)+'</span>');
+      else if(now) meta.push('<span class="td">今日まで</span>');
+      else if(it.期限) meta.push('〜'+esc(it.期限));
+      if(it.圃場) meta.push(esc(it.圃場));
+      if(done && it.完了日時) meta.push('完了 '+esc(it.完了日時));
+      return '<div class="item'+(done?' done':over?' over':now?' today':'')+'" data-id="'+esc(it.記録ID)+'">'+
+        '<div class="box'+(done?' on':'')+'" data-act="toggle"><svg viewBox="0 0 24 24"><path d="M4 12l6 6L20 6"/></svg></div>'+
+        '<div class="body"><div class="txt">'+esc(it.内容)+'</div>'+
+          (meta.length?'<div class="meta">'+meta.join(' ・ ')+'</div>':'')+
+        '</div>'+
+        '<button class="del" data-act="del" aria-label="削除">×</button>'+
+      '</div>';
+    }).join('');
+  }catch(e){
+    $('list').innerHTML='<div class="empty">読み込めませんでした。<br><small>GASの再デプロイは済んでいますか？</small></div>';
+  }
+}
+
+$('list').addEventListener('click', async e=>{
+  const el = e.target.closest('[data-act]'); if(!el) return;
+  const row = el.closest('.item'); const id = row.dataset.id;
+  if(el.dataset.act==='toggle'){
+    const done = row.classList.contains('done');
+    row.style.opacity='.4';
+    try{
+      await fetch(CONFIG.GAS_URL+'?action='+(done?'undoneTodo':'doneTodo')+'&記録ID='+encodeURIComponent(id));
+      load();
+    }catch(_){ toast('更新できませんでした'); row.style.opacity=''; }
+  }else if(el.dataset.act==='del'){
+    if(!confirm('このメモを削除しますか？')) return;
+    try{
+      await fetch(CONFIG.GAS_URL+'?action=deleteTodo&記録ID='+encodeURIComponent(id));
+      toast('削除しました'); load();
+    }catch(_){ toast('削除できませんでした'); }
+  }
+});
+
+$('toggle').onclick = e=>{
+  e.preventDefault();
+  showAll = !showAll;
+  $('toggle').textContent = showAll ? '未完了だけ表示' : '完了分も表示';
+  load();
+};
+
+load();
+</script>
+</body>
+</html>
