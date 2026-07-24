@@ -575,6 +575,12 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </style>
 </head>
 <body>
+<button id="todoFab" aria-label="やることを追加">＋</button>
+<div id="todoModal"><div class="in">
+  <h3>やることメモ</h3>
+  <input type="text" id="todoText" placeholder="例：ねぎ横畑の電気柵を点検" enterkeyhint="done">
+  <div class="rowb"><button class="ng" id="todoCancel">やめる</button><button class="ok" id="todoOk">追加</button></div>
+</div></div>
 <div class="wrap">
   <header>
     <div class="brand">
@@ -4036,11 +4042,5 @@ async function saveCalEdit(crop){
 
 
 </script>
-<button id="todoFab" aria-label="やることを追加">＋</button>
-<div id="todoModal"><div class="in">
-  <h3>やることメモ</h3>
-  <input type="text" id="todoText" placeholder="例：ねぎ横畑の電気柵を点検" enterkeyhint="done">
-  <div class="rowb"><button class="ng" id="todoCancel">やめる</button><button class="ok" id="todoOk">追加</button></div>
-</div></div>
 </body>
 </html>
