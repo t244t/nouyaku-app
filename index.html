@@ -555,8 +555,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .subchip[aria-pressed="true"]{background:var(--stem-dk);border-color:var(--stem-dk);color:#fff}
 
 /* やることメモ：クイック追加 */
-#todoFab{position:fixed;right:16px;bottom:22px;z-index:60;width:56px;height:56px;border:0;border-radius:50%;
-  background:var(--stem);color:#fff;font-size:28px;line-height:1;box-shadow:0 4px 14px rgba(24,35,26,.28);cursor:pointer}
+#todoFab{position:fixed;right:16px;bottom:22px;z-index:60;display:flex;align-items:center;gap:7px;
+  border:0;border-radius:999px;padding:13px 20px 13px 16px;background:var(--stem);color:#fff;
+  font-size:14px;font-weight:800;box-shadow:0 4px 14px rgba(24,35,26,.28);cursor:pointer;white-space:nowrap}
+#todoFab .plus{font-size:20px;line-height:1;font-weight:400}
 #todoModal{position:fixed;inset:0;z-index:70;background:rgba(24,35,26,.38);display:none;align-items:flex-end}
 #todoModal.on{display:flex}
 #todoModal .in{background:#fff;width:100%;max-width:480px;margin:0 auto;border-radius:16px 16px 0 0;padding:16px 14px 22px}
@@ -575,7 +577,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 </style>
 </head>
 <body>
-<button id="todoFab" aria-label="やることを追加">＋</button>
+<button id="todoFab" aria-label="やることを追加"><span class="plus">＋</span><span>やることメモ</span></button>
 <div id="todoModal"><div class="in">
   <h3>やることメモ</h3>
   <input type="text" id="todoText" placeholder="例：ねぎ横畑の電気柵を点検" enterkeyhint="done">
