@@ -83,7 +83,8 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
     <div class="note">
       月ごとの「売上経過表」シートを選んで取り込みます。売上数（点数）を集計対象にします。
-      同じ月を取り込み直すと上書きします。品目名がシートで違う書き方（例：長茄子 / 長茄子/茄子）だと別品目として集計されます。
+      同じ月を取り込み直すと上書きします。品目名がシートで違う書き方（例：長茄子 / 長茄子/茄子）だと別品目になりますが、
+      スプレッドシートの「品目別名」シートに対応を書くと集計時にまとめられます（白茄子など別品種はそのまま分けられます）。
     </div>
   </div>
 
@@ -113,6 +114,7 @@ let parsed = null; // {年月, records, cropTotals}
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
 function numv(v){ if(v===null||v===undefined||v==='') return 0; const n=Number(v); return isNaN(n)?0:n; }
+function fmtYm(ym){ const m=String(ym).match(/(\d{4})-(\d{1,2})/); return m ? (m[1]+'年'+Number(m[2])+'月') : String(ym); }
 
 /* Excelの日付（シリアル or Date）→ Date */
 function toDate(v){
@@ -277,7 +279,7 @@ function loadMonths(){
       const cur = sel.value;
       sel.innerHTML = '<option value="">全期間</option>';
       (res.months||[]).forEach(m=>{
-        const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
+        const o=document.createElement('option'); o.value=m; o.textContent=fmtYm(m); sel.appendChild(o);
       });
       if(cur) sel.value = cur;
     }).catch(()=>{});
@@ -318,7 +320,7 @@ function renderMonths(list){
   let html='';
   list.forEach(m=>{
     const w = Math.max(4, Math.round((m.売上数/max)*100));
-    html += '<div class="mrow"><div class="ym">'+esc(m.年月)+'</div>'
+    html += '<div class="mrow"><div class="ym">'+esc(fmtYm(m.年月))+'</div>'
       + '<div class="bar"><i style="width:'+w+'%"></i></div>'
       + '<div class="mv">'+m.売上数+'</div></div>';
   });
