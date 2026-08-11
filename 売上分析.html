@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>売上分析｜農・みのり</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --warn:#9A6B00; --warn-bg:#FBF3DC;
+  --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding:12px 14px 40px}
+header{display:flex;align-items:center;gap:10px;margin:6px 2px 14px}
+header .leaf{font-size:1.3rem}
+header h1{font-size:1.05rem;margin:0;color:var(--stem-dk);font-weight:800}
+header .sub{font-size:.72rem;color:var(--soft)}
+.back{margin-left:auto;font-size:.8rem;color:var(--stem-dk);text-decoration:none;
+  border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 10px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+  padding:14px 15px;box-shadow:var(--shadow);margin-bottom:12px}
+.eyebrow{font-size:.72rem;font-weight:800;color:var(--stem-dk);letter-spacing:.04em;margin:0 0 8px}
+.row{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+input[type=file]{font-size:.85rem}
+select,.btn{font:inherit;border-radius:9px;border:1px solid var(--line);
+  background:var(--card);color:var(--ink);padding:8px 11px;font-size:.85rem}
+.btn{cursor:pointer;font-weight:700}
+.btn.pri{background:var(--stem);border-color:var(--stem);color:#fff}
+.btn.pri:disabled{background:#b9c9ba;border-color:#b9c9ba;cursor:not-allowed}
+.btn:active{transform:scale(.98)}
+.muted{color:var(--soft);font-size:.8rem}
+.note{background:var(--warn-bg);border:1px solid #ecdca6;color:var(--warn);
+  border-radius:10px;padding:9px 11px;font-size:.8rem;line-height:1.6;margin-top:10px}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+th{color:var(--soft);font-weight:700;font-size:.76rem}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.bar{position:relative;background:#eef3ea;border-radius:6px;height:22px;overflow:hidden;min-width:60px}
+.bar > i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#4c9a5e,#2E6B3A);border-radius:6px}
+.bar > span{position:relative;z-index:1;font-size:.76rem;font-weight:800;color:#123;
+  padding:0 7px;line-height:22px;white-space:nowrap}
+.rk{display:grid;grid-template-columns:1.6rem 6.5rem 1fr auto;gap:8px;align-items:center;margin:5px 0}
+.rk .no{font-weight:800;color:var(--soft);text-align:center}
+.rk .nm{font-weight:700;font-size:.86rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rk .sh{font-size:.74rem;color:var(--soft);text-align:right;min-width:3.2rem}
+.mrow{display:grid;grid-template-columns:4.2rem 1fr auto;gap:8px;align-items:center;margin:5px 0}
+.mrow .ym{font-size:.8rem;color:var(--soft)}
+.mrow .mv{font-size:.8rem;font-weight:800;text-align:right;min-width:3.5rem}
+.empty{color:var(--soft);font-size:.85rem;padding:8px 2px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);
+  background:#18231A;color:#fff;padding:10px 16px;border-radius:10px;font-size:.85rem;
+  opacity:0;transition:opacity .25s;pointer-events:none;z-index:50}
+#toast.on{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="leaf">📊</span>
+    <div>
+      <h1>売上分析</h1>
+      <div class="sub">農・みのり</div>
+    </div>
+    <a class="back" href="index.html">← 戻る</a>
+  </header>
+
+  <!-- 取込 -->
+  <div class="card">
+    <div class="eyebrow">📥 売上表を取り込む</div>
+    <div class="row">
+      <input type="file" id="file" accept=".xlsx,.xls">
+      <select id="sheetSel" style="display:none"></select>
+    </div>
+    <div id="preview" style="margin-top:10px"></div>
+    <div class="row" id="importRow" style="margin-top:10px;display:none">
+      <button class="btn pri" id="importBtn" disabled>この内容で取り込む</button>
+      <span class="muted" id="importInfo"></span>
+    </div>
+    <div class="note">
+      月ごとの「売上経過表」シートを選んで取り込みます。売上数（点数）を集計対象にします。
+      同じ月を取り込み直すと上書きします。品目名がシートで違う書き方（例：長茄子 / 長茄子/茄子）だと別品目として集計されます。
+    </div>
+  </div>
+
+  <!-- 分析 -->
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <div class="eyebrow" style="margin:0">🥇 品目別 売れ筋ランキング</div>
+      <select id="period"><option value="">全期間</option></select>
+    </div>
+    <div id="ranking" style="margin-top:10px"><div class="empty">読み込み中…</div></div>
+  </div>
+
+  <div class="card">
+    <div class="eyebrow">📈 月別の売上数（点数）推移</div>
+    <div id="months"><div class="empty">—</div></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec";
+
+let workbook = null;
+let parsed = null; // {年月, records, cropTotals}
+
+function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
+function numv(v){ if(v===null||v===undefined||v==='') return 0; const n=Number(v); return isNaN(n)?0:n; }
+
+/* Excelの日付（シリアル or Date）→ Date */
+function toDate(v){
+  if(v instanceof Date) return v;
+  if(typeof v==='number' && v>20000 && v<80000){
+    const o = XLSX.SSF.parse_date_code(v);
+    if(o) return new Date(o.y, o.m-1, o.d);
+  }
+  return null;
+}
+function fmtDate(d){
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+
+/* 経過表シートを解析 → {年月, records, cropTotals}
+ * 売上列は「左が納品・右が在庫」の点数表の列だけを対象にする（右側の金額欄¥は拾わない）。
+ * v1は信頼できる「売上数（点数）」のみ抽出する。 */
+function parseSheet(ws){
+  const aoa = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:''});
+  // 見出し行（納品・売上・在庫を含む行）を探す
+  let hIdx = -1;
+  for(let i=0;i<Math.min(aoa.length,15);i++){
+    const j = aoa[i].map(x=>String(x)).join('|');
+    if(j.indexOf('在庫')>=0 && j.indexOf('納品')>=0 && j.indexOf('売上')>=0){ hIdx=i; break; }
+  }
+  if(hIdx < 1) throw new Error('売上経過表の見出しが見つかりません');
+
+  const sub     = aoa[hIdx].map(x=>String(x).trim());
+  const croprow = (aoa[hIdx-1]||[]).map(x=>String(x).trim());
+
+  // 品目名アンカー（見出し直上の非空セル）
+  const anchors = [];
+  for(let c=0;c<croprow.length;c++){
+    if(croprow[c] && croprow[c]!=='TOTAL') anchors.push({c:c, name:croprow[c]});
+  }
+  function nearestCrop(col){
+    let best=null;
+    for(const a of anchors){ if(a.c<=col && (!best || a.c>best.c)) best=a; }
+    return best;
+  }
+
+  // 有効な売上列＝ sub が売上/売上数 で、左が納品・右が在庫。品目は直近アンカー（2列以内）
+  const soldCols = [];
+  for(let c=0;c<sub.length;c++){
+    const s=sub[c], left=sub[c-1]||'', right=sub[c+1]||'';
+    if((s==='売上数'||s==='売上') && right==='在庫' && (left==='納品数'||left==='納品')){
+      const a = nearestCrop(c);
+      if(a && a.c >= c-2) soldCols.push({c:c, name:a.name});
+    }
+  }
+  if(!soldCols.length) throw new Error('売上数の列が見つかりません');
+
+  // データ行（B列が日付）
+  const recAll = [], ymCount = {};
+  for(let r=hIdx+1;r<aoa.length;r++){
+    const row = aoa[r]; if(!row) continue;
+    const c1 = String(row[1]||'').trim();
+    if(c1==='TOTAL' || c1==='日付' || c1==='NO') break; // 上段の日次データの区切り。下段の¥表は読まない
+    const d = toDate(row[1]); if(!d) continue;
+    const iso = fmtDate(d), ym = iso.slice(0,7);
+    ymCount[ym] = (ymCount[ym]||0)+1;
+    soldCols.forEach(sc=>{
+      const raw = row[sc.c];
+      if(raw==='' || raw===null || raw===undefined) return;
+      const sold = numv(raw);
+      if(sold===0) return;
+      recAll.push({日付:iso, 品目:sc.name, 売上数:sold});
+    });
+  }
+  // 主たる年月に絞る
+  const ym = Object.keys(ymCount).sort((a,b)=>ymCount[b]-ymCount[a])[0] || '';
+  const records = recAll.filter(x=>x.日付.slice(0,7)===ym);
+  const cropTotals = {};
+  records.forEach(x=>{ cropTotals[x.品目]=(cropTotals[x.品目]||0)+x.売上数; });
+  return {年月:ym, records, cropTotals};
+}
+
+function renderPreview(){
+  const box = document.getElementById('preview');
+  const importRow = document.getElementById('importRow');
+  const btn = document.getElementById('importBtn');
+  if(!parsed || !parsed.年月){ box.innerHTML='<div class="empty">読み取れませんでした</div>'; importRow.style.display='none'; return; }
+  const rows = Object.keys(parsed.cropTotals)
+    .map(c=>({品目:c, 売上数:parsed.cropTotals[c]}))
+    .sort((a,b)=>b.売上数-a.売上数);
+  const total = rows.reduce((s,x)=>s+x.売上数,0);
+  let html = '<div class="muted" style="margin-bottom:6px">'+esc(parsed.年月)+'ぶん ／ 明細 '+parsed.records.length+'行 ／ 売上合計 '+total+'点</div>';
+  html += '<table><tr><th>品目</th><th class="num">売上数</th></tr>';
+  rows.forEach(r=>{ html += '<tr><td>'+esc(r.品目)+'</td><td class="num">'+r.売上数+'</td></tr>'; });
+  html += '</table>';
+  box.innerHTML = html;
+  importRow.style.display = 'flex';
+  document.getElementById('importInfo').textContent = '';
+  btn.disabled = (parsed.records.length===0);
+}
+
+function handleWorkbook(){
+  const sel = document.getElementById('sheetSel');
+  sel.innerHTML = '';
+  workbook.SheetNames.forEach(n=>{
+    const o=document.createElement('option'); o.value=n; o.textContent=n; sel.appendChild(o);
+  });
+  sel.value = workbook.SheetNames[workbook.SheetNames.length-1]; // 既定は最後のシート
+  sel.style.display = '';
+  reparse();
+}
+function reparse(){
+  const name = document.getElementById('sheetSel').value;
+  try{
+    parsed = parseSheet(workbook.Sheets[name]);
+  }catch(e){
+    parsed = null;
+    document.getElementById('preview').innerHTML = '<div class="empty">'+esc(e.message||'解析できませんでした')+'</div>';
+    document.getElementById('importRow').style.display='none';
+    return;
+  }
+  renderPreview();
+}
+
+document.getElementById('file').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ev=>{
+    try{
+      workbook = XLSX.read(new Uint8Array(ev.target.result), {type:'array', cellDates:true});
+      handleWorkbook();
+    }catch(err){ toast('ファイルを読めませんでした'); }
+  };
+  reader.readAsArrayBuffer(f);
+});
+document.getElementById('sheetSel').addEventListener('change', reparse);
+
+document.getElementById('importBtn').addEventListener('click', ()=>{
+  if(!parsed || !parsed.年月 || !parsed.records.length) return;
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true;
+  document.getElementById('importInfo').textContent = '取込中…';
+  fetch(GAS_URL, { method:'POST', body: JSON.stringify({
+    action:'importSales', 年月:parsed.年月, records:parsed.records
+  })})
+  .then(r=>r.json())
+  .then(res=>{
+    if(res && res.ok){
+      toast(res.年月+' を取り込みました（'+res.count+'行）');
+      document.getElementById('importInfo').textContent = '取込済み';
+      loadMonths().then(()=>loadStats(document.getElementById('period').value));
+    }else{
+      toast('取込に失敗：'+((res&&res.error)||'不明'));
+      document.getElementById('importInfo').textContent = '';
+      btn.disabled = false;
+    }
+  })
+  .catch(()=>{ toast('通信に失敗しました'); document.getElementById('importInfo').textContent=''; btn.disabled=false; });
+});
+
+/* ---- 分析表示 ---- */
+function loadMonths(){
+  return fetch(GAS_URL+'?action=listSalesMonths&_='+Date.now())
+    .then(r=>r.json())
+    .then(res=>{
+      const sel = document.getElementById('period');
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">全期間</option>';
+      (res.months||[]).forEach(m=>{
+        const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
+      });
+      if(cur) sel.value = cur;
+    }).catch(()=>{});
+}
+function loadStats(ym){
+  const rk = document.getElementById('ranking'), mo = document.getElementById('months');
+  rk.innerHTML = '<div class="empty">読み込み中…</div>';
+  const q = ym ? ('&ym='+encodeURIComponent(ym)) : '';
+  fetch(GAS_URL+'?action=salesStats'+q+'&_='+Date.now())
+    .then(r=>r.json())
+    .then(res=>{
+      if(!res || !res.ok){ rk.innerHTML='<div class="empty">取得できませんでした</div>'; return; }
+      renderRanking(res.ranking||[], res.total||0);
+      renderMonths(res.months||[]);
+    })
+    .catch(()=>{ rk.innerHTML='<div class="empty">通信に失敗しました</div>'; });
+}
+function renderRanking(list, total){
+  const rk = document.getElementById('ranking');
+  if(!list.length){ rk.innerHTML='<div class="empty">まだデータがありません。売上表を取り込んでください。</div>'; return; }
+  const max = list[0].売上数 || 1;
+  let html='';
+  list.forEach((r,i)=>{
+    const w = Math.max(4, Math.round((r.売上数/max)*100));
+    const sh = total ? ((r.売上数/total*100).toFixed(1)+'%') : '';
+    html += '<div class="rk">'
+      + '<div class="no">'+(i+1)+'</div>'
+      + '<div class="nm">'+esc(r.品目)+'</div>'
+      + '<div class="bar"><i style="width:'+w+'%"></i><span>'+r.売上数+'</span></div>'
+      + '<div class="sh">'+sh+'</div></div>';
+  });
+  rk.innerHTML = html;
+}
+function renderMonths(list){
+  const mo = document.getElementById('months');
+  if(!list.length){ mo.innerHTML='<div class="empty">—</div>'; return; }
+  const max = Math.max.apply(null, list.map(x=>x.売上数)) || 1;
+  let html='';
+  list.forEach(m=>{
+    const w = Math.max(4, Math.round((m.売上数/max)*100));
+    html += '<div class="mrow"><div class="ym">'+esc(m.年月)+'</div>'
+      + '<div class="bar"><i style="width:'+w+'%"></i></div>'
+      + '<div class="mv">'+m.売上数+'</div></div>';
+  });
+  mo.innerHTML = html;
+}
+
+document.getElementById('period').addEventListener('change', e=>loadStats(e.target.value));
+
+/* 初期表示 */
+loadMonths().then(()=>loadStats(''));
+</script>
+</body>
+</html>
