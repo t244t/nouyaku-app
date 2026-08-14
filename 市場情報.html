@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>市場情報｜農・みのり</title>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --warn:#9A6B00; --warn-bg:#FBF3DC;
+  --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
+  -webkit-text-size-adjust:100%}
+.wrap{max-width:760px;margin:0 auto;padding:12px 14px 40px}
+header{display:flex;align-items:center;gap:10px;margin:6px 2px 14px}
+header .leaf{font-size:1.3rem}
+header h1{font-size:1.05rem;margin:0;color:var(--stem-dk);font-weight:800}
+header .sub{font-size:.72rem;color:var(--soft)}
+.back{margin-left:auto;font-size:.8rem;color:var(--stem-dk);text-decoration:none;
+  border:1px solid var(--line);background:var(--card);border-radius:9px;padding:6px 10px}
+.lead{font-size:.82rem;color:var(--soft);line-height:1.7;margin:0 2px 14px}
+.eyebrow{font-size:.72rem;font-weight:800;color:var(--stem-dk);letter-spacing:.04em;margin:16px 2px 8px}
+.eyebrow:first-of-type{margin-top:2px}
+a.link{display:block;text-decoration:none;color:inherit;
+  background:var(--card);border:1px solid var(--line);border-radius:13px;
+  padding:13px 15px;margin-bottom:10px;box-shadow:var(--shadow);
+  transition:transform .08s, border-color .15s}
+a.link:active{transform:scale(.995)}
+a.link:hover{border-color:#c5d3c2}
+.link .ttl{display:flex;align-items:center;gap:8px;font-weight:800;font-size:.95rem;color:var(--stem-dk)}
+.link .ttl .ico{font-size:1.05rem}
+.link .ttl .arw{margin-left:auto;color:var(--soft);font-size:.95rem}
+.link .desc{font-size:.82rem;color:var(--ink);line-height:1.6;margin-top:5px}
+.link .src{font-size:.7rem;color:var(--soft);margin-top:5px}
+.badge{display:inline-block;font-size:.66rem;font-weight:700;border-radius:6px;padding:1px 6px;margin-left:6px;
+  background:#eef3ea;color:var(--stem-dk);vertical-align:middle}
+.badge.pdf{background:#f6e9e2;color:#9A5B2B}
+.note{background:var(--warn-bg);border:1px solid #ecdca6;color:var(--warn);
+  border-radius:10px;padding:10px 12px;font-size:.78rem;line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="leaf">🏷️</span>
+    <div>
+      <h1>市場情報</h1>
+      <div class="sub">農・みのり</div>
+    </div>
+    <a class="back" href="index.html">← 戻る</a>
+  </header>
+
+  <p class="lead">
+    青果の市場価格・相場を確認できる公的サイトへの入り口です。値付けや、何を出すか・作るかの判断の参考に。
+    なす・ピーマン・きゅうり・トマト・キャベツなど、うちの主力品目もひととおりカバーされています。
+  </p>
+
+  <div class="eyebrow">📍 福岡の市況（地元）</div>
+
+  <a class="link" href="https://agrine.jp/wholesale-market.php?mrk=40320" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">📈</span>アグリネ｜福岡市中央卸売市場 市況<span class="arw">↗</span></div>
+    <div class="desc">品目別に高値・中値・安値をグラフで表示。スマホでも見やすく、日々の相場感をつかむのに便利です。</div>
+    <div class="src">agrine.jp（民間サイト）</div>
+  </a>
+
+  <a class="link" href="https://www.city.fukuoka.lg.jp/nosui/shijo/life/torihikikekkatounokouhyou_2.html" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">🏛️</span>福岡市｜取引結果等の公表<span class="badge pdf">PDF</span><span class="arw">↗</span></div>
+    <div class="desc">福岡市中央卸売市場（青果）の取引結果の公式公表。産地・数量・価格の一次情報です。</div>
+    <div class="src">city.fukuoka.lg.jp（公式）</div>
+  </a>
+
+  <a class="link" href="https://fdydo.co.jp/" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">🥬</span>福岡大同青果<span class="arw">↗</span></div>
+    <div class="desc">福岡市中央卸売市場の青果卸売会社。日々の一般市況（高値・中値・安値）をサイトで公開しています。</div>
+    <div class="src">fdydo.co.jp（卸売会社）</div>
+  </a>
+
+  <div class="eyebrow">🗾 全国の相場・小売動向（農畜産業振興機構ほか）</div>
+
+  <a class="link" href="https://vegetan.alic.go.jp/vegetable_price.html" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">📊</span>ベジ探｜最近の野菜の卸売価格動向<span class="arw">↗</span></div>
+    <div class="desc">各中央卸売市場の卸売価格を、過去5カ年の旬別平均と比べられます。相場が高いか安いかの判断に。</div>
+    <div class="src">vegetan.alic.go.jp（公式・農畜産業振興機構）</div>
+  </a>
+
+  <a class="link" href="https://vegetan.alic.go.jp/list.html" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">🔎</span>ベジ探｜卸売市場別 入荷量・価格 DB検索<span class="arw">↗</span></div>
+    <div class="desc">日別・旬別・年別・産地別で、市場ごとの入荷量と価格を条件検索できるデータベースです。</div>
+    <div class="src">vegetan.alic.go.jp（公式）</div>
+  </a>
+
+  <a class="link" href="https://vegetan.alic.go.jp/retail-price-trends/price-trend-survey.html" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">🛒</span>ベジ探｜野菜小売価格動向調査（月別）<span class="arw">↗</span></div>
+    <div class="desc">福岡市を含む主要都市の量販店価格を毎月調査。キャベツ・きゅうり・トマト・なす・ピーマン等が対象で、直売の値付けの目安になります。</div>
+    <div class="src">vegetan.alic.go.jp（公式）</div>
+  </a>
+
+  <a class="link" href="https://vegetan.alic.go.jp/" target="_blank" rel="noopener">
+    <div class="ttl"><span class="ico">🌐</span>ベジ探｜トップ（野菜情報総合把握システム）<span class="arw">↗</span></div>
+    <div class="desc">市況・気象・輸出入・消費・生産まで、野菜の統計をまとめて調べられる入り口です。</div>
+    <div class="src">vegetan.alic.go.jp（公式）</div>
+  </a>
+
+  <div class="note">
+    各リンクは外部の公的サイト等が開きます。福岡市・大同青果の日々の市況はPDFで公開されています。
+    数字の速報値や過去比較は、次の段階でアプリ内にも取り込めます（月別相場の取り込みなど）。
+  </div>
+</div>
+</body>
+</html>
