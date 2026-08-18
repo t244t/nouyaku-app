@@ -3370,9 +3370,9 @@ function todayStr(){ const d=new Date(); return d.getFullYear()+'-'+String(d.get
 async function loadSummaryData(){
   if(!CONFIG.GAS_URL) return;
   const td=todayStr();
-  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listPlan&'+new URLSearchParams({状態:'予定',to:td}))).json();
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listPlan&'+new URLSearchParams({状態:'予定'}))).json();
     SUM.plans=(j&&j.plans)?j.plans:[]; }catch(e){ SUM.plans=[]; }
-  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWorkPlan&'+new URLSearchParams({状態:'予定',to:td}))).json();
+  try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listWorkPlan&'+new URLSearchParams({状態:'予定'}))).json();
     SUM.wplans=(j&&j.plans)?j.plans:[]; }catch(e){ SUM.wplans=[]; }
   try{ const j=await (await fetch(CONFIG.GAS_URL+'?action=listCalendar')).json();
     SUM.cal=(j&&j.calendar)?j.calendar:[]; }catch(e){ SUM.cal=[]; }
@@ -3393,21 +3393,25 @@ function renderSummary(){
        ' ☂'+((d.precip_prob&&d.precip_prob[0]!=null)?d.precip_prob[0]:'–')+'%'+
        ((d.wind&&d.wind[0]!=null)?(' 風'+Math.round(d.wind[0])+'m/s'):'');
   }
-  const spT=SUM.plans.filter(p=>p['予定日']===td), spO=SUM.plans.filter(p=>p['予定日']<td);
-  const wkT=SUM.wplans.filter(p=>p['予定日']===td), wkO=SUM.wplans.filter(p=>p['予定日']<td);
-  const sprayItems=SUM.plans.slice(0,3).map(p=>esc(p['品目']||'')+'／'+esc(p['対象']||'')+'　'+esc(p['農薬名']||'')+'（'+esc(p['予定日']||'')+(p['予定日']<td?' 遅れ':'')+'）').join('<br>');
-  const workItems=SUM.wplans.slice(0,3).map(p=>esc(p['カテゴリ']||'')+'／'+esc(p['作業内容']||'')+'　'+esc(p['圃場']||'')+'（'+esc(p['予定日']||'')+(p['予定日']<td?' 遅れ':'')+'）').join('<br>');
+  const spT=SUM.plans.filter(p=>p['予定日']===td), spO=SUM.plans.filter(p=>p['予定日']<td), spF=SUM.plans.filter(p=>p['予定日']>td);
+  const wkT=SUM.wplans.filter(p=>p['予定日']===td), wkO=SUM.wplans.filter(p=>p['予定日']<td), wkF=SUM.wplans.filter(p=>p['予定日']>td);
+  const byDate=(a,b)=>String(a['予定日']).localeCompare(String(b['予定日']));
+  // 表示優先：遅れ→今日→この先（近い順）、最大3件
+  const sprayPick=[].concat(spO.slice().sort(byDate), spT.slice().sort(byDate), spF.slice().sort(byDate)).slice(0,3);
+  const workPick =[].concat(wkO.slice().sort(byDate), wkT.slice().sort(byDate), wkF.slice().sort(byDate)).slice(0,3);
+  const tagOf=p=>{ const d=String(p['予定日']||''); return d<td?' 遅れ':(d===td?' 今日':''); };
+  const planLabel=(T,O,F)=>{ if(!T&&!O&&!F) return '（なし）'; const a=['今日'+T,'遅れ'+O]; if(F) a.push('この先'+F); return '（'+a.join('・')+'）'; };
+  const sprayItems=sprayPick.map(p=>esc(p['品目']||'')+'／'+esc(p['対象']||'')+'　'+esc(p['農薬名']||'')+'（'+esc(p['予定日']||'')+tagOf(p)+'）').join('<br>');
+  const workItems=workPick.map(p=>esc(p['カテゴリ']||'')+'／'+esc(p['作業内容']||'')+'　'+esc(p['圃場']||'')+'（'+esc(p['予定日']||'')+tagOf(p)+'）').join('<br>');
 
   let h='<div class="sumcard">';
   h+='<div class="sumhd">今日の状況　'+md(td)+'（'+dow+'）</div>';
   if(wx) h+='<div class="sumwx">'+wx+'</div>';
   if(SUM.alerts.length)
     h+='<div class="sumrow warn first">⚠️ 気象の注意 '+SUM.alerts.length+'件（下のアラート参照）</div>';
-  h+='<a class="sumrow link'+(SUM.alerts.length?'':' first')+'" href="防除予定.html">🧴 防除予定 '+(spT.length+spO.length)+'件'+
-     ((spT.length+spO.length)?'（今日'+spT.length+'・遅れ'+spO.length+'）':'（なし）')+
+  h+='<a class="sumrow link'+(SUM.alerts.length?'':' first')+'" href="防除予定.html">🧴 防除予定 '+planLabel(spT.length,spO.length,spF.length)+
      (sprayItems?'<div class="sumsub">'+sprayItems+'</div>':'')+'</a>';
-  h+='<div class="sumrow link" id="sumWork">🧑‍🌾 作業予定 '+(wkT.length+wkO.length)+'件'+
-     ((wkT.length+wkO.length)?'（今日'+wkT.length+'・遅れ'+wkO.length+'）':'（なし）')+
+  h+='<div class="sumrow link" id="sumWork">🧑‍🌾 作業予定 '+planLabel(wkT.length,wkO.length,wkF.length)+
      (workItems?'<div class="sumsub">'+workItems+'</div>':'')+'</div>';
   // 収穫が近い作物（実作付けがあれば実日付で圃場つき、無ければ標準暦の月単位）
   const harvNow=[], harvSoon=[];
