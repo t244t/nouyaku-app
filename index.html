@@ -2248,7 +2248,8 @@ async function submitVoiceText(){
 function applyVoiceResult(v){
   const cats=Object.keys(WORK_CATEGORIES);
   workCat=(v.カテゴリ && cats.indexOf(v.カテゴリ)>=0)?v.カテゴリ:(workCat||'その他');
-  voicePrefill={ 圃場:v.圃場||'', 作業日:v.作業日||'', 時間:v.時間||'', 作業内容:v.作業内容||'', メモ:v.メモ||'' };
+  const _content=(v.作業内容&&String(v.作業内容).trim())?v.作業内容:(v.原文||'');
+  voicePrefill={ 圃場:v.圃場||'', 作業日:v.作業日||'', 時間:v.時間||'', 作業内容:_content, メモ:v.メモ||'' };
   renderWorkForm();
   const sh=document.getElementById('fSheet'); if(sh) sh.scrollTop=0;
   toast('音声から入力しました。内容を確認して保存してください');
