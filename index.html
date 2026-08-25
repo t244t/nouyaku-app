@@ -618,6 +618,14 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .vbtn:disabled{opacity:.6;cursor:default}
 .vhint{font-size:.76rem;color:#5a6b58;line-height:1.5}
 @keyframes vpulse{0%,100%{box-shadow:0 0 0 0 rgba(198,40,40,.5)}50%{box-shadow:0 0 0 6px rgba(198,40,40,0)}}
+
+/* 音声入力パネル */
+.vpane{flex-basis:100%;margin-top:6px}
+.vpane textarea{width:100%;box-sizing:border-box;border:1px solid #cfe0f5;border-radius:10px;padding:9px 11px;font:inherit;font-size:.92rem;resize:vertical}
+.vpane-btns{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
+.vbtn2{border:1px solid #2e6bb0;background:#2e6bb0;color:#fff;font-weight:800;font-size:.85rem;border-radius:9px;padding:8px 12px;cursor:pointer}
+.vbtn2.ghost{background:#fff;color:#1f4f86}
+.vbtn2:disabled{opacity:.6}
 </style>
 </head>
 <body>
@@ -2108,7 +2116,14 @@ function renderWorkForm(){
     '<div class="fh"><div class="nm">作業報告・予定</div></div>'+
     '<div class="rec">'+
       (editingWorkId?('<div class="editbar"><span>修正中（保存すると上書きされます）</span><button id="w_cancel">新規に戻る</button></div>'):'')+
-      (editingWorkId?'':'<div class="voicebox" id="voiceBox"><button type="button" class="vbtn" id="voiceBtn">🎤 音声で入力</button><span class="vhint" id="voiceHint">タップして話す（例：今日ねぎ前上で草刈り2時間）</span></div>')+
+      (editingWorkId?'':'<div class="voicebox" id="voiceBox">'+
+        '<button type="button" class="vbtn" id="voiceBtn">🎤 音声で入力</button>'+
+        '<span class="vhint">押すと欄が開きます。キーボードの🎤（音声入力）で話すと、AIが項目に振り分けます。</span>'+
+        '<div id="voicePane" class="vpane" style="display:none">'+
+          '<textarea id="voiceText" rows="3" placeholder="キーボードの🎤を押して話す（例：今日ねぎ前上で草刈り2時間、オクラの下葉かきも）"></textarea>'+
+          '<div class="vpane-btns"><button type="button" class="vbtn2" id="voiceGo">この内容で項目に入れる</button>'+
+          '<button type="button" class="vbtn2 ghost" id="voiceCancel">閉じる</button></div>'+
+        '</div></div>')+
       '<div class="field"><label>カテゴリー</label><div class="catgrid">'+catBtns+'</div>'+subHtml+'</div>'+
       (workCat==='除草' ? '<div class="field"><label>除草した範囲</label><div class="catgrid" id="weedRangeBtns">'+
         '<button type="button" class="catbtn rng" data-r="全部" aria-pressed="'+(weedRange!=='一部'?'true':'false')+'">全部刈った</button>'+
@@ -2145,6 +2160,8 @@ function renderWorkForm(){
   const cb=document.getElementById('w_cancel'); if(cb) cb.onclick=cancelEditWork;
   const wf2=document.getElementById('w_field'); if(wf2) wf2.addEventListener('change', renderWorkPlanSummary);
   const vb=document.getElementById('voiceBtn'); if(vb) vb.onclick=toggleVoice;
+  const vg=document.getElementById('voiceGo'); if(vg) vg.onclick=submitVoiceText;
+  const vc=document.getElementById('voiceCancel'); if(vc) vc.onclick=toggleVoice;
   renderWorkPlanSummary();
   if(editPrefillPending){ editPrefillPending=false; applyEditPrefill(); }
   if(voicePrefill){ applyVoicePrefill(); }
@@ -2204,55 +2221,34 @@ function currentWorkContent(){
   if(wrap && wrap.style.display!=='none') return valOf('w_free').trim();
   return '';
 }
-/* ===== 音声で作業入力 ===== */
-let voicePrefill=null, voiceState='idle', mediaRec=null, recChunks=[], recStream=null;
-function setVoiceUI(st){
-  voiceState=st;
-  const b=document.getElementById('voiceBtn'), h=document.getElementById('voiceHint');
-  if(!b) return;
-  if(st==='recording'){ b.textContent='■ 録音を止める'; b.classList.add('rec'); b.disabled=false; if(h) h.textContent='録音中…話し終えたら「止める」を押す'; }
-  else if(st==='processing'){ b.textContent='認識中…'; b.classList.remove('rec'); b.disabled=true; if(h) h.textContent='音声を解析しています…'; }
-  else { b.textContent='🎤 音声で入力'; b.classList.remove('rec'); b.disabled=false; if(h) h.textContent='タップして話す（例：今日ねぎ前上で草刈り2時間）'; }
+/* ===== 音声で作業入力（キーボードのマイクで話す→AIが項目に振り分け） ===== */
+let voicePrefill=null;
+function toggleVoice(){
+  const p=document.getElementById('voicePane'); if(!p) return;
+  const open=(p.style.display!=='none');
+  p.style.display=open?'none':'block';
+  if(!open){ const t=document.getElementById('voiceText'); if(t){ t.focus(); } }
 }
-function toggleVoice(){ if(voiceState==='recording') stopVoiceRec(); else if(voiceState==='idle') startVoiceRec(); }
-async function startVoiceRec(){
-  if(!navigator.mediaDevices || !window.MediaRecorder){ toast('この端末は録音に対応していません'); return; }
-  try{ recStream=await navigator.mediaDevices.getUserMedia({audio:true}); }
-  catch(e){ toast('マイクを使えませんでした（権限を確認してください）'); return; }
-  recChunks=[];
-  try{ mediaRec=new MediaRecorder(recStream); }catch(e){ try{ mediaRec=new MediaRecorder(recStream,{}); }catch(e2){ toast('録音を開始できませんでした'); return; } }
-  mediaRec.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
-  mediaRec.onstop=onVoiceStop;
-  mediaRec.start();
-  setVoiceUI('recording');
-}
-function stopVoiceRec(){ try{ if(mediaRec&&mediaRec.state!=='inactive') mediaRec.stop(); }catch(e){} }
-async function onVoiceStop(){
-  if(recStream){ recStream.getTracks().forEach(t=>t.stop()); recStream=null; }
-  setVoiceUI('processing');
-  if(!CONFIG.GAS_URL){ toast('GAS未接続のため使えません'); setVoiceUI('idle'); return; }
+async function submitVoiceText(){
+  const t=document.getElementById('voiceText'); const txt=t?t.value.trim():'';
+  if(!txt){ toast('話した内容が空です。キーボードの🎤で話してください'); return; }
+  if(!CONFIG.GAS_URL){ toast('GAS未接続のため使えません'); return; }
+  const go=document.getElementById('voiceGo'); if(go){ go.disabled=true; go.textContent='認識中…'; }
   try{
-    const blob=new Blob(recChunks,{type:(recChunks[0]&&recChunks[0].type)||'audio/webm'});
-    const buf=await blob.arrayBuffer();
-    const AC=window.AudioContext||window.webkitAudioContext;
-    const ac=new AC();
-    const audio=await ac.decodeAudioData(buf);
-    const wav=encodeWavMono16k(audio);
-    try{ ac.close(); }catch(e){}
-    const b64=await blobToB64_(wav);
     const fields=(fieldList.length?fieldList.map(f=>f.name):FIELDS);
     const res=await fetch(CONFIG.GAS_URL,{method:'POST', body:JSON.stringify({
-      action:'transcribeWork', audioB64:b64, mime:'audio/wav',
-      today:todayStr(), fields:fields, categories:Object.keys(WORK_CATEGORIES)
+      action:'transcribeWork', text:txt, today:todayStr(),
+      fields:fields, categories:Object.keys(WORK_CATEGORIES)
     })}).then(r=>r.json());
-    if(res&&res.ok){ applyVoiceResult(res); setVoiceUI('idle'); }
-    else{ toast('音声を認識できませんでした'+(res&&res.error?('：'+res.error):'')); setVoiceUI('idle'); }
-  }catch(e){ toast('音声の処理に失敗しました'); setVoiceUI('idle'); }
+    if(res&&res.ok){ applyVoiceResult(res); }
+    else toast('うまく解釈できませんでした'+(res&&res.error?('：'+res.error):''));
+  }catch(e){ toast('通信に失敗しました'); }
+  finally{ if(go){ go.disabled=false; go.textContent='この内容で項目に入れる'; } }
 }
 function applyVoiceResult(v){
   const cats=Object.keys(WORK_CATEGORIES);
   workCat=(v.カテゴリ && cats.indexOf(v.カテゴリ)>=0)?v.カテゴリ:(workCat||'その他');
-  voicePrefill={ 圃場:v.圃場||'', 作業日:v.作業日||'', 時間:v.時間||'', 作業内容:v.作業内容||'', メモ:v.メモ||'', 原文:v.原文||'' };
+  voicePrefill={ 圃場:v.圃場||'', 作業日:v.作業日||'', 時間:v.時間||'', 作業内容:v.作業内容||'', メモ:v.メモ||'' };
   renderWorkForm();
   const sh=document.getElementById('fSheet'); if(sh) sh.scrollTop=0;
   toast('音声から入力しました。内容を確認して保存してください');
@@ -2272,25 +2268,8 @@ function applyVoicePrefill(){
     const free=document.getElementById('w_free'); if(free) free.value=v.作業内容;
   }
   const memo=document.getElementById('w_memo');
-  if(memo){ let t=v.メモ||''; if(v.原文) t=(t?t+' ／ ':'')+'（音声）'+v.原文; if(t) memo.value=(memo.value?memo.value+' ':'')+t; }
+  if(memo && v.メモ){ memo.value=(memo.value?memo.value+' ':'')+v.メモ; }
   renderWorkPlanSummary();
-}
-function blobToB64_(blob){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(String(r.result).split(',')[1]); r.onerror=rej; r.readAsDataURL(blob); }); }
-function encodeWavMono16k(audioBuffer){
-  const targetRate=16000, ch=audioBuffer.numberOfChannels, len=audioBuffer.length;
-  let mono=new Float32Array(len);
-  for(let c=0;c<ch;c++){ const d=audioBuffer.getChannelData(c); for(let i=0;i<len;i++) mono[i]+=d[i]/ch; }
-  const ratio=audioBuffer.sampleRate/targetRate, outLen=Math.max(1,Math.floor(len/ratio));
-  const out=new Float32Array(outLen);
-  for(let i=0;i<outLen;i++){ const idx=i*ratio, i0=Math.floor(idx), i1=Math.min(i0+1,len-1), fr=idx-i0; out[i]=mono[i0]*(1-fr)+mono[i1]*fr; }
-  const buffer=new ArrayBuffer(44+outLen*2), view=new DataView(buffer);
-  const wr=(o,str)=>{ for(let i=0;i<str.length;i++) view.setUint8(o+i,str.charCodeAt(i)); };
-  wr(0,'RIFF'); view.setUint32(4,36+outLen*2,true); wr(8,'WAVE'); wr(12,'fmt ');
-  view.setUint32(16,16,true); view.setUint16(20,1,true); view.setUint16(22,1,true);
-  view.setUint32(24,targetRate,true); view.setUint32(28,targetRate*2,true);
-  view.setUint16(32,2,true); view.setUint16(34,16,true); wr(36,'data'); view.setUint32(40,outLen*2,true);
-  let off=44; for(let i=0;i<outLen;i++){ let sm=Math.max(-1,Math.min(1,out[i])); view.setInt16(off, sm<0?sm*0x8000:sm*0x7FFF, true); off+=2; }
-  return new Blob([view],{type:'audio/wav'});
 }
 function saveWork(){
   if(!workCat){ toast('カテゴリーを選んでください'); return; }
