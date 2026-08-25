@@ -2232,18 +2232,29 @@ function toggleVoice(){
 async function submitVoiceText(){
   const t=document.getElementById('voiceText'); const txt=t?t.value.trim():'';
   if(!txt){ toast('話した内容が空です。キーボードの🎤で話してください'); return; }
-  if(!CONFIG.GAS_URL){ toast('GAS未接続のため使えません'); return; }
+  if(t) t.blur();  // キーボードを閉じる（記録ボタンが隠れないように）
   const go=document.getElementById('voiceGo'); if(go){ go.disabled=true; go.textContent='認識中…'; }
-  try{
-    const fields=(fieldList.length?fieldList.map(f=>f.name):FIELDS);
-    const res=await fetch(CONFIG.GAS_URL,{method:'POST', body:JSON.stringify({
-      action:'transcribeWork', text:txt, today:todayStr(),
-      fields:fields, categories:Object.keys(WORK_CATEGORIES)
-    })}).then(r=>r.json());
-    if(res&&res.ok){ applyVoiceResult(res); }
-    else toast('うまく解釈できませんでした'+(res&&res.error?('：'+res.error):''));
-  }catch(e){ toast('通信に失敗しました'); }
-  finally{ if(go){ go.disabled=false; go.textContent='この内容で項目に入れる'; } }
+  let res=null;
+  if(CONFIG.GAS_URL){
+    try{
+      const fields=(fieldList.length?fieldList.map(f=>f.name):FIELDS);
+      res=await fetch(CONFIG.GAS_URL,{method:'POST', body:JSON.stringify({
+        action:'transcribeWork', text:txt, today:todayStr(),
+        fields:fields, categories:Object.keys(WORK_CATEGORIES)
+      })}).then(r=>r.json());
+    }catch(e){ res=null; }
+  }
+  if(res && res.ok){
+    applyVoiceResult(res);
+    toast('音声から入力しました。内容を確認して保存してください');
+  }else{
+    // AI振り分けに失敗しても、話した内容はそのまま作業内容へ入れて先に進めるようにする
+    if(!workCat) workCat='その他';
+    voicePrefill={ 圃場:'', 作業日:'', 時間:'', 作業内容:txt, メモ:'' };
+    renderWorkForm();
+    const sh=document.getElementById('fSheet'); if(sh) sh.scrollTop=0;
+    toast('話した内容を作業内容に入れました。項目を確認して保存してください');
+  }
 }
 function applyVoiceResult(v){
   const cats=Object.keys(WORK_CATEGORIES);
@@ -2252,7 +2263,6 @@ function applyVoiceResult(v){
   voicePrefill={ 圃場:v.圃場||'', 作業日:v.作業日||'', 時間:v.時間||'', 作業内容:_content, メモ:v.メモ||'' };
   renderWorkForm();
   const sh=document.getElementById('fSheet'); if(sh) sh.scrollTop=0;
-  toast('音声から入力しました。内容を確認して保存してください');
 }
 function applyVoicePrefill(){
   const v=voicePrefill; voicePrefill=null; if(!v) return;
