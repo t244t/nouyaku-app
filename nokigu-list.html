@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>農機具 一覧（改善版）</title>
+<style>
+  :root{
+    --green:#2e7d34;--green-d:#1f5a25;
+    --ink:#1c2417;--sub:#6b7566;--line:#e7ece3;--bg:#f4f6f1;--card:#ffffff;
+    /* 倉庫の色（場所） */
+    --w-negi:#2e7d34;--w-iimori:#c77a10;--w-kaizuka:#2563c9;--w-farm:#8a3ab0;--w-other:#6b7566;
+    /* 状態の色（使えるか） */
+    --s-ok:#2e9e46;--s-check:#e0a800;--s-broken:#d13b3b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:720px;margin:0 auto;min-height:100vh;}
+
+  header{position:sticky;top:0;z-index:20;background:var(--card);border-bottom:1px solid var(--line);padding:14px 16px 10px;}
+  .head-row{display:flex;align-items:center;gap:10px;}
+  h1{font-size:19px;margin:0;font-weight:700;letter-spacing:.02em;flex:1;}
+  .count-pill{background:#eef4ea;color:var(--green-d);font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;}
+  .btn{border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;padding:8px 12px;}
+  .btn-add{background:var(--green);color:#fff;}
+  .btn-add:active{background:var(--green-d);}
+  .btn-close{background:#f0f2ed;color:var(--sub);}
+
+  .search{margin-top:10px;position:relative;}
+  .search input{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px 10px 36px;font-size:15px;background:#fafbf8;}
+  .search input:focus{outline:2px solid #cfe3c9;border-color:var(--green);background:#fff;}
+  .search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:.45;}
+
+  /* 要対応サマリー＋トグル */
+  .alert{display:flex;align-items:center;gap:10px;margin:10px 16px 0;padding:9px 12px;border-radius:11px;
+    background:#fff7e6;border:1px solid #f2e0b0;font-size:13px;color:#8a6400;font-weight:700;}
+  .alert .warn{color:var(--s-broken);}
+  .alert .sp{flex:1;}
+  .toggle{border:1px solid #e6cf88;background:#fff;color:#8a6400;border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .toggle.on{background:var(--s-check);color:#fff;border-color:transparent;}
+
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:10px 16px 6px;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:999px;padding:7px 13px;
+    font-size:13px;font-weight:600;color:var(--sub);cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:6px;}
+  .tab .dot{width:8px;height:8px;border-radius:50%;background:currentColor;}
+  .tab[data-w="negi"]{color:var(--w-negi);}.tab[data-w="iimori"]{color:var(--w-iimori);}
+  .tab[data-w="kaizuka"]{color:var(--w-kaizuka);}.tab[data-w="farm"]{color:var(--w-farm);}
+  .tab[data-w="other"]{color:var(--w-other);}.tab[data-w="all"]{color:var(--ink);}
+  .tab .n{color:var(--sub);font-weight:700;font-size:12px;}
+  .tab.active{color:#fff;border-color:transparent;}
+  .tab.active .n{color:rgba(255,255,255,.85);}
+  .tab.active .dot{background:#fff;}
+  .tab.active[data-w="all"]{background:var(--ink);}
+  .tab.active[data-w="negi"]{background:var(--w-negi);}.tab.active[data-w="iimori"]{background:var(--w-iimori);}
+  .tab.active[data-w="kaizuka"]{background:var(--w-kaizuka);}.tab.active[data-w="farm"]{background:var(--w-farm);}
+  .tab.active[data-w="other"]{background:var(--w-other);}
+
+  .list{padding:6px 12px 40px;}
+  .row{display:flex;align-items:center;gap:13px;background:var(--card);border:1px solid var(--line);
+    border-radius:14px;padding:11px 13px;margin-bottom:9px;cursor:pointer;transition:transform .06s,box-shadow .12s;
+    border-left:4px solid var(--w-color,var(--line));}
+  .row:active{transform:scale(.994);}
+  .row:hover{box-shadow:0 2px 10px rgba(30,50,20,.06);}
+  /* 状態が悪い行は淡く着色して浮かせる */
+  .row.st-check{background:#fffaf0;}
+  .row.st-broken{background:#fdf3f3;border-color:#f3d6d6;}
+
+  .thumb{width:52px;height:52px;flex:0 0 52px;border-radius:11px;overflow:hidden;display:grid;place-items:center;
+    font-size:24px;background:var(--thumb-bg,#eef2ea);position:relative;}
+  .thumb img{width:100%;height:100%;object-fit:cover;display:block;}
+  /* サムネ角に状態ドット */
+  .thumb .sdot{position:absolute;right:-3px;bottom:-3px;width:16px;height:16px;border-radius:50%;border:2.5px solid #fff;}
+  .sdot.ok{background:var(--s-ok);}.sdot.check{background:var(--s-check);}.sdot.broken{background:var(--s-broken);}
+
+  .body{flex:1;min-width:0;}
+  .name{font-size:15px;font-weight:700;line-height:1.35;color:var(--ink);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .meta{display:flex;align-items:center;gap:7px;margin-top:5px;flex-wrap:wrap;}
+  .chip{font-size:11.5px;font-weight:700;padding:2.5px 8px;border-radius:999px;color:#fff;display:inline-flex;align-items:center;gap:4px;}
+  .chip.negi{background:var(--w-negi);}.chip.iimori{background:var(--w-iimori);}
+  .chip.kaizuka{background:var(--w-kaizuka);}.chip.farm{background:var(--w-farm);}.chip.other{background:var(--w-other);}
+  .sbadge{font-size:11.5px;font-weight:800;padding:2.5px 8px;border-radius:7px;display:inline-flex;align-items:center;gap:4px;}
+  .sbadge.check{background:#fbeecb;color:#8a6400;}
+  .sbadge.broken{background:#f6d9d9;color:#b02525;}
+  .sbadge.ok{color:var(--s-ok);font-weight:700;}
+  .chev{color:#cdd5c8;flex:0 0 auto;}
+  .empty{text-align:center;color:var(--sub);padding:50px 20px;font-size:14px;}
+  .empty b{color:var(--ink);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="head-row">
+      <h1>農機具</h1>
+      <span class="count-pill" id="count">17件</span>
+      <button class="btn btn-add">＋ 追加</button>
+      <button class="btn btn-close">閉じる</button>
+    </div>
+    <div class="search">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" placeholder="名前で検索（例：ホース）" autocomplete="off">
+    </div>
+  </header>
+
+  <div class="alert" id="alert" style="display:none;">
+    <span id="alertText"></span><span class="sp"></span>
+    <button class="toggle" id="toggle" onclick="toggleAttn()">要対応のみ</button>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div class="list" id="list"></div>
+</div>
+
+<script>
+/* ===== データ（倉庫・状態は仮割当。実データに差し替え）===== */
+const W = {
+  negi:{label:"ねぎぼうず倉庫",cls:"negi",color:"#2e7d34"},
+  iimori:{label:"飯盛倉庫",cls:"iimori",color:"#c77a10"},
+  kaizuka:{label:"貝塚倉庫",cls:"kaizuka",color:"#2563c9"},
+  farm:{label:"ファーム倉庫",cls:"farm",color:"#8a3ab0"},
+  other:{label:"その他",cls:"other",color:"#6b7566"},
+};
+const S = { ok:{label:"稼働中"}, check:{label:"点検要"}, broken:{label:"故障"} };
+
+const items = [
+  {name:"クボタトラクター", w:"negi", st:"ok", icon:"🚜"},
+  {name:"トラクターSL280", w:"negi", st:"check", icon:"🚜"},
+  {name:"共立 エンジンブロワー", w:"iimori", st:"ok", icon:"🌬️"},
+  {name:"共立 エンジンブロワー", w:"iimori", st:"broken", icon:"🌬️"},
+  {name:"クボタTRS600 陽菜 管理機　耕運機", w:"negi", st:"ok", icon:"🚜"},
+  {name:"クボタ　田植機", w:"negi", st:"ok", icon:"🌾"},
+  {name:"TOYOTA フォークリフト", w:"iimori", st:"ok", icon:"🏗️"},
+  {name:"トップリンクアツシ", w:"farm", st:"ok", icon:"🔩"},
+  {name:"アームセントピンカンビ", w:"farm", st:"ok", icon:"🔩"},
+  {name:"アタマツキピン", w:"farm", st:"ok", icon:"🔩"},
+  {name:"アポロ菜園柵", w:"other", st:"ok", icon:"🚧"},
+  {name:"SUGANO（天地返し）", w:"iimori", st:"check", icon:"🚜"},
+  {name:"KUBOTA　ロータリー", w:"negi", st:"ok", icon:"⚙️"},
+  {name:"エンジンポンプ 4サイクル 25mm エンジン式ポンプ アルミニウム製 高出力 洗浄ホースセット 省燃費 給水 レギュラーガソリン", w:"kaizuka", st:"ok", icon:"💧"},
+  {name:"農業用耐圧ホース", w:"kaizuka", st:"ok", icon:"🧵"},
+  {name:"BIGM（丸山製作所）ホースカップリング 樹脂 25mm", w:"farm", st:"ok", icon:"🔗"},
+  {name:"自在散水ノズル 25", w:"farm", st:"ok", icon:"🚿"},
+];
+
+let activeW="all", query="", attnOnly=false;
+const rank={broken:0,check:1,ok:2}; // 故障→点検要→稼働中の順で上に
+
+function counts(){const c={all:items.length};for(const k in W)c[k]=items.filter(i=>i.w===k).length;return c;}
+
+function renderTabs(){
+  const c=counts();
+  const order=["all","negi","iimori","kaizuka","farm","other"];
+  const labels={all:"すべて",...Object.fromEntries(Object.entries(W).map(([k,v])=>[k,v.label]))};
+  document.getElementById("tabs").innerHTML=order.map(k=>`
+    <button class="tab ${activeW===k?'active':''}" data-w="${k}" onclick="setW('${k}')">
+      ${k!=="all"?'<span class="dot"></span>':''}${labels[k]}<span class="n">${c[k]}</span>
+    </button>`).join("");
+}
+
+function renderAlert(){
+  const chk=items.filter(i=>i.st==="check").length;
+  const brk=items.filter(i=>i.st==="broken").length;
+  const box=document.getElementById("alert");
+  if(chk+brk===0){box.style.display="none";return;}
+  box.style.display="flex";
+  const parts=[];
+  if(brk)parts.push(`<span class="warn">故障 ${brk}</span>`);
+  if(chk)parts.push(`点検要 ${chk}`);
+  document.getElementById("alertText").innerHTML="⚠ "+parts.join(" ・ ");
+}
+
+function renderList(){
+  let list=items.filter(i=>
+    (activeW==="all"||i.w===activeW) &&
+    (query===""||i.name.toLowerCase().includes(query)) &&
+    (!attnOnly||i.st!=="ok")
+  ).sort((a,b)=>rank[a.st]-rank[b.st]);
+
+  document.getElementById("count").textContent=list.length+"件";
+  const el=document.getElementById("list");
+  if(!list.length){el.innerHTML=`<div class="empty"><b>該当なし</b><br>絞り込みや検索語を変えてみてください。</div>`;return;}
+
+  el.innerHTML=list.map(i=>{
+    const w=W[i.w];
+    const sb = i.st==="ok"
+      ? `<span class="sbadge ok">稼働中</span>`
+      : `<span class="sbadge ${i.st}">${i.st==="broken"?"故障":"点検要"}</span>`;
+    return `
+    <div class="row st-${i.st}" style="--w-color:${w.color};">
+      <div class="thumb" style="--thumb-bg:${hexA(w.color,.12)};">
+        <!-- 実データでは <img src="写真URL"> に差し替え -->
+        <span>${i.icon}</span>
+        <span class="sdot ${i.st}"></span>
+      </div>
+      <div class="body">
+        <div class="name">${esc(i.name)}</div>
+        <div class="meta">
+          <span class="chip ${w.cls}">${w.label}</span>
+          ${sb}
+        </div>
+      </div>
+      <svg class="chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="m9 18 6-6-6-6"/></svg>
+    </div>`;
+  }).join("");
+}
+
+function setW(k){activeW=k;renderTabs();renderList();}
+function toggleAttn(){attnOnly=!attnOnly;document.getElementById("toggle").classList.toggle("on",attnOnly);renderList();}
+document.getElementById("q").addEventListener("input",e=>{query=e.target.value.trim().toLowerCase();renderList();});
+
+function esc(s){return s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function hexA(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;}
+
+renderTabs();renderAlert();renderList();
+</script>
+</body>
+</html>
