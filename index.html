@@ -389,18 +389,22 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 .dilresult .rwait{color:#aeb8aa;font-weight:700;font-size:14px}
 .dilnote{font-size:11.5px;color:var(--soft);line-height:1.6;margin-top:14px}
 #toolBody{padding:10px 12px 40px;display:flex;flex-direction:column;gap:10px;overflow:auto}
-.tcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:stretch}
+.tcard{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--wc,var(--line));border-radius:14px;overflow:hidden;box-shadow:var(--shadow);cursor:pointer;display:flex;align-items:stretch}
+.wcol-negi{--wc:#2E6B3A}.wcol-iimori{--wc:#C77A10}.wcol-kaizuka{--wc:#2563C9}.wcol-farm{--wc:#8A3AB0}.wcol-other{--wc:#6B7566}
+.toolsearch{padding:8px 12px 2px}
+.toolsearch input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px 9px 12px;font-size:14px;background:#fafbf8;color:var(--ink)}
+.toolsearch input:focus{outline:2px solid var(--stem);border-color:var(--stem);background:#fff}
 .tcard .timgwrap{width:116px;height:92px;flex:0 0 116px;background:#eef1ea;overflow:hidden;display:flex;align-items:center;justify-content:center}
 .tcard .timgwrap img{width:116px;height:92px;object-fit:cover;display:block}
 .tcard .timgwrap .ph{color:#aeb8aa;font-size:26px}
 .tcard .tin{flex:1;min-width:0;padding:9px 11px}
 .tcard .tnm{font-size:14px;font-weight:800;color:var(--stem-dk);line-height:1.25}
 .tcard .tmeta{font-size:11.5px;color:var(--sub);margin-top:3px}
-.tcard .twh{display:inline-block;margin-top:6px;margin-right:5px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:#EEF3EA;color:var(--stem-dk)}
+.tcard .twh{display:inline-block;margin-top:6px;margin-right:5px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--wc,#6B7566);color:#fff}
 .tst{display:inline-block;margin-top:6px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
 .toolfilter{display:flex;gap:7px;overflow-x:auto;padding:8px 12px;border-bottom:1px solid var(--line);-webkit-overflow-scrolling:touch}
 .toolfilter .fchip{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--stem-dk);border-radius:999px;padding:6px 13px;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
-.toolfilter .fchip.on{background:var(--stem);color:#fff;border-color:var(--stem)}
+.toolfilter .fchip.on{background:var(--wc,var(--stem));color:#fff;border-color:var(--wc,var(--stem))}
 .tst.使用中{background:#E0F5FA;color:var(--done-dk)} .tst.保管中{background:#E4F0E6;color:var(--stem-dk)}
 .tst.点検中{background:#FBF1D0;color:#9a7a00} .tst.故障{background:var(--warn-bg);color:var(--jokusou)}
 .tprev{width:100%;height:180px;border-radius:10px;background:#eef1ea center/cover no-repeat;margin-bottom:8px;display:flex;align-items:center;justify-content:center;color:#aeb8aa;font-size:30px}
@@ -1012,6 +1016,7 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
   </div>
   <div class="callegend"><span style="color:var(--soft)">農機具の一覧です。タップで詳細・編集ができます。</span></div>
   <div id="toolFilter" class="toolfilter"></div>
+  <div class="toolsearch"><input id="toolSearch" type="search" placeholder="名前・メーカーで検索" autocomplete="off"></div>
   <div id="toolBody" class="calbody"></div>
 </div>
 
@@ -3116,7 +3121,8 @@ async function deleteStock(id){
 const TOOL_KINDS=['トラクター','管理機','耕運機','田植機','コンバイン','刈払機','草刈機','噴霧器・防除機','運搬車・軽トラ','ポンプ','その他'];
 const TOOL_WAREHOUSES=['ねぎぼうず倉庫','飯盛倉庫','貝塚倉庫','ファーム倉庫'];
 const TOOL_STATES=['使用中','保管中','点検中','故障'];
-let toolList=[], toolPhotoMap={}, editingToolId=null, pendingToolPhoto=null, toolWh='すべて';
+let toolList=[], toolPhotoMap={}, editingToolId=null, pendingToolPhoto=null, toolWh='すべて', toolQuery='';
+function toolWhKey(w){const m={'ねぎぼうず倉庫':'negi','飯盛倉庫':'iimori','貝塚倉庫':'kaizuka','ファーム倉庫':'farm'};return m[String(w||'').trim()]||'other';}
 async function loadToolData(){
   toolList=[]; toolPhotoMap={};
   if(!CONFIG.GAS_URL) return;
@@ -3144,22 +3150,25 @@ function renderToolFilter(){
   Object.keys(cnt).forEach(w=>{ if(items.indexOf(w)<0) items.push(w); });
   box.innerHTML=items.map(function(w){
     const n=(w==='すべて')?toolList.length:(cnt[w]||0);
-    return '<button class="fchip'+(toolWh===w?' on':'')+'" data-w="'+esc(w)+'">'+esc(w)+'（'+n+'）</button>';
+    return '<button class="fchip wcol-'+(w==='すべて'?'none':toolWhKey(w))+(toolWh===w?' on':'')+'" data-w="'+esc(w)+'">'+esc(w)+'（'+n+'）</button>';
   }).join('');
   box.querySelectorAll('.fchip').forEach(b=>b.onclick=()=>{ toolWh=b.dataset.w; renderToolFilter(); renderToolList(); });
 }
 function renderToolList(){
   const box=document.getElementById('toolBody'); if(!box) return;
   let list=toolList;
-  if(toolWh!=='すべて') list=toolList.filter(t=>String(t['保管倉庫']||'その他')===toolWh);
-  if(!list.length){ box.innerHTML='<div class="note" style="padding:16px">'+(toolList.length?'この倉庫の農機具はありません。':'まだ農機具の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
+  if(toolWh!=='すべて') list=list.filter(t=>String(t['保管倉庫']||'その他')===toolWh);
+  const q=String(toolQuery||'').trim().toLowerCase();
+  if(q) list=list.filter(t=>((t['名前']||'')+(t['メーカー']||'')+(t['型番']||'')+(t['種類']||'')).toLowerCase().indexOf(q)>=0);
+  if(!list.length){ box.innerHTML='<div class="note" style="padding:16px">'+(toolList.length?'該当する農機具がありません。':'まだ農機具の登録がありません。「＋ 追加」から登録できます。')+'</div>'; return; }
   box.innerHTML=list.map(function(t){
     const id=esc(t['農機具ID']||'');
+    const wk=toolWhKey(t['保管倉庫']);
     const img=toolPhotoMap[t['農機具ID']]||'';
-    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="" width="116" height="92">'):'<span class="ph">🚜</span>')+'</div>';
+    const imgHtml='<div class="timgwrap">'+(img?('<img src="'+img+'" alt="" width="116" height="92" loading="lazy">'):'<span class="ph">🚜</span>')+'</div>';
     const meta=[t['メーカー'],t['型番']].filter(function(x){return x;}).map(esc).join(' ');
     const st=esc(t['状態']||'保管中');
-    return '<div class="tcard" onclick="openToolDetail(\''+id+'\')">'+imgHtml+
+    return '<div class="tcard wcol-'+wk+'" onclick="openToolDetail(\''+id+'\')">'+imgHtml+
       '<div class="tin"><div class="tnm">'+esc(t['名前']||'(名称未設定)')+'</div>'+
       (meta?'<div class="tmeta">'+meta+'</div>':'')+
       '<div><span class="twh">📍 '+esc(t['保管倉庫']||'—')+'</span><span class="tst '+st+'">'+st+'</span></div>'+
@@ -3282,6 +3291,7 @@ document.getElementById('stockCloseBtn').onclick=()=>document.getElementById('st
 document.getElementById('stockAddBtn').onclick=()=>openStockForm(null);
 document.getElementById('toolCloseBtn').onclick=()=>document.getElementById('toolView').classList.remove('show');
 document.getElementById('toolAddBtn').onclick=()=>openToolForm(null);
+document.getElementById('toolSearch').addEventListener('input',function(e){ toolQuery=e.target.value||''; renderToolList(); });
 document.getElementById('whCloseBtn').onclick=()=>document.getElementById('workHistView').classList.remove('show');
 document.getElementById('whAddBtn').onclick=openWorkForm;
 document.getElementById('openDiag').onclick=openDiag;
