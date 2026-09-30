@@ -474,6 +474,10 @@ header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8
 #map{position:absolute;inset:0}
 .leaflet-tile{filter:contrast(1.04) saturate(1.02)}
 .leaflet-container{background:#2b3a2b;font-family:inherit}
+.crop-legend{background:rgba(255,255,255,.93);padding:6px 9px;border-radius:9px;font-size:11px;color:#1c2417;box-shadow:0 1px 6px rgba(0,0,0,.2);max-width:60vw;line-height:1.5}
+.crop-legend b{display:block;font-size:10px;letter-spacing:.06em;color:#5A6B58;margin-bottom:2px}
+.crop-legend span{display:inline-flex;align-items:center;gap:4px;margin:1px 8px 1px 0;white-space:nowrap}
+.crop-legend i{width:11px;height:11px;border-radius:2px;border:1px solid rgba(0,0,0,.15);display:inline-block}
 .mtop{position:absolute;z-index:1000;top:0;left:0;right:0;
   padding:calc(env(safe-area-inset-top) + 12px) 14px 14px;
   background:linear-gradient(to bottom,rgba(18,26,18,.8),rgba(18,26,18,0));pointer-events:none}
@@ -1766,21 +1770,110 @@ async function loadFields(){
 
 function fStyle(name){ const st=(mapStatus[name]&&mapStatus[name].state)||'todo'; const c= st==='done'?getCss('--done') : st==='partial'?getCss('--partial') : getCss('--jokusou'); return {color:c,weight:3,opacity:1,fillColor:c,fillOpacity:.25}; }
 
+/* ---- 作物色帯（Bプラン：圃場を作物ごとに色分け） ---- */
+const CROP_COLORS={
+  'さつまいも':'#E8730C','サツマイモ':'#E8730C',
+  'かぼちゃ':'#F2C200','カボチャ':'#F2C200',
+  'まくわうり':'#B9CC2E','マクワウリ':'#B9CC2E','まくわ':'#B9CC2E',
+  'オクラ':'#4CA02C','おくら':'#4CA02C',
+  '白菜':'#EDEDE0','はくさい':'#EDEDE0',
+  'コールラビ':'#7FA03A',
+  'なす':'#8A3AB0','なすび':'#8A3AB0','茄子':'#8A3AB0','長茄子':'#8A3AB0','白茄子':'#C79BE0',
+  'ピーマン':'#2E8B57','ししとう':'#3CB371','シシトウ':'#3CB371','甘長ししとう':'#3CB371',
+  'きゅうり':'#5FA33A','トマト':'#D64545','ミニトマト':'#E06666',
+  'キャベツ':'#8FBC5A','レタス':'#9ACD5A',
+  'じゃがいも':'#C8A96A','ジャガイモ':'#C8A96A',
+  '玉ねぎ':'#D9A441','たまねぎ':'#D9A441',
+  'にんにく':'#E8D8A0','ニンニク':'#E8D8A0',
+  '人参':'#E8862E','にんじん':'#E8862E',
+  'ホウレン草':'#3E8E3E','ほうれん草':'#3E8E3E',
+  'トウモロコシ':'#F0D000','とうもろこし':'#F0D000',
+  '落花生':'#C2A878','バターピーナッツ':'#C2A878','スナップエンドウ':'#7CBF6B',
+  'お米':'#C9B037','水稲':'#C9B037',
+  '菜の花':'#F2D200','デコポン':'#F39A1E','アンコールオレンジ':'#F3B01E'
+};
+const CROP_PALETTE=['#4CA02C','#E8730C','#F2C200','#2563C9','#8A3AB0','#B9CC2E','#D64545','#3CB371','#C8A96A','#E8862E'];
+function cropColor(name){
+  const n=String(name||'').trim(); if(!n) return '#9aa79a';
+  if(CROP_COLORS[n]) return CROP_COLORS[n];
+  for(const k in CROP_COLORS){ if(n.indexOf(k)>=0||k.indexOf(n)>=0) return CROP_COLORS[k]; }
+  let h=0; for(let i=0;i<n.length;i++) h=(h*31+n.charCodeAt(i))>>>0;
+  return CROP_PALETTE[h%CROP_PALETTE.length];
+}
+/* その圃場の作物一覧（実作付け優先→無ければ栽培作物テキスト） */
+function fieldCrops(f){
+  let cs=cropsInField(f.name);
+  if(!cs||!cs.length){ cs=String(f['栽培作物']||'').split(/[,、\/・\s]+/).map(s=>s.trim()).filter(Boolean); }
+  return cs;
+}
+/* 凸多角形を軸に平行な直線で半分に切る（Sutherland–Hodgman） */
+function clipHalf(ring, idx, v, keepGE){
+  const out=[], n=ring.length;
+  for(let i=0;i<n;i++){
+    const A=ring[i], B=ring[(i+1)%n], a=A[idx], b=B[idx];
+    const inA=keepGE?(a>=v):(a<=v), inB=keepGE?(b>=v):(b<=v);
+    if(inA) out.push(A);
+    if(inA!==inB){ const t=(v-a)/(b-a); out.push([A[0]+(B[0]-A[0])*t, A[1]+(B[1]-A[1])*t]); }
+  }
+  return out;
+}
+/* 圃場ポリゴンを n 本の帯に分割（長い辺方向に等分） */
+function bandSplit(ring, n){
+  if(n<=1) return [ring];
+  let latMin=Infinity,latMax=-Infinity,lonMin=Infinity,lonMax=-Infinity;
+  ring.forEach(p=>{latMin=Math.min(latMin,p[0]);latMax=Math.max(latMax,p[0]);lonMin=Math.min(lonMin,p[1]);lonMax=Math.max(lonMax,p[1]);});
+  const useLon=(lonMax-lonMin)>=(latMax-latMin), idx=useLon?1:0, lo=useLon?lonMin:latMin, hi=useLon?lonMax:latMax;
+  const bands=[];
+  for(let k=0;k<n;k++){
+    const v0=lo+(hi-lo)*k/n, v1=lo+(hi-lo)*(k+1)/n;
+    let b=clipHalf(ring, idx, v0, true);
+    if(b.length>=3) b=clipHalf(b, idx, v1, false);
+    if(b.length>=3) bands.push(b);
+  }
+  return bands.length?bands:[ring];
+}
+/* 地図上の作物凡例 */
+let cropLegendCtl=null;
+function updateCropLegend(list){
+  if(cropLegendCtl){ try{ mapObj.removeControl(cropLegendCtl); }catch(e){} cropLegendCtl=null; }
+  if(!list||!list.length) return;
+  cropLegendCtl=L.control({position:'bottomleft'});
+  cropLegendCtl.onAdd=function(){
+    const d=L.DomUtil.create('div','crop-legend');
+    d.innerHTML='<b>作物</b>'+list.map(c=>'<span><i style="background:'+cropColor(c)+'"></i>'+esc(c)+'</span>').join('');
+    L.DomEvent.disableClickPropagation(d);
+    return d;
+  };
+  cropLegendCtl.addTo(mapObj);
+}
+
 function buildLayers(){
   if(fieldLayer){ mapObj.removeLayer(fieldLayer); }
   fieldLayer=L.layerGroup().addTo(mapObj); layerByName={};
   const bounds=[];
+  const legendSet=[];
   fieldList.forEach(f=>{
     if(!f.lat||!f.lon) return;
     const ring=fieldRing(f);
-    const poly=L.polygon(ring, fStyle(f.name)).addTo(fieldLayer);
+    const crops=fieldCrops(f);
+    // 作物ごとの色帯（塗り分け）
+    if(crops.length){
+      bandSplit(ring, crops.length).forEach((b,i)=>{
+        const c=crops[i]||crops[crops.length-1];
+        L.polygon(b,{stroke:false,fillColor:cropColor(c),fillOpacity:.6,interactive:false}).addTo(fieldLayer);
+      });
+      crops.forEach(c=>{ if(legendSet.indexOf(c)<0) legendSet.push(c); });
+    }
+    // 圃場の枠線（除草ステータス色）＋クリック。塗りは色帯に任せ、中は透明にして帯を見せる
+    const stStyle=fStyle(f.name); if(crops.length){ stStyle.fillOpacity=0; }
+    const poly=L.polygon(ring, stStyle).addTo(fieldLayer);
     poly.on('click',()=>openField(f));
     layerByName[f.name]=poly;
-    const crops=cropsInField(f.name);
     const cropLine=crops.length?('<div class="fld-crop">'+crops.map(esc).join('・')+'</div>'):'';
     L.marker([f.lat,f.lon],{icon:L.divIcon({className:'',html:'<div class="fld-label">'+esc(f.name)+cropLine+'</div>',iconSize:[0,0]}),interactive:false}).addTo(fieldLayer);
     ring.forEach(pt=>bounds.push(pt));
   });
+  updateCropLegend(legendSet);
   try{ if(bounds.length) mapObj.fitBounds(bounds,{padding:[40,40]}); }catch(e){}
 }
 
