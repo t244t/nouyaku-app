@@ -83,8 +83,7 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
     </div>
     <div class="note">
       月ごとの「売上経過表」シートを選んで取り込みます。売上数（点数）を集計対象にします。
-      同じ月を取り込み直すと上書きします。品目名がシートで違う書き方（例：長茄子 / 長茄子/茄子）だと別品目になりますが、
-      スプレッドシートの「品目別名」シートに対応を書くと集計時にまとめられます（白茄子など別品種はそのまま分けられます）。
+      同じ月を取り込み直すと上書きします。品目名がシートで違う書き方（例：長茄子 / 長茄子/茄子）だと別品目として集計されます。
     </div>
   </div>
 
@@ -114,7 +113,6 @@ let parsed = null; // {年月, records, cropTotals}
 function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2200); }
 function numv(v){ if(v===null||v===undefined||v==='') return 0; const n=Number(v); return isNaN(n)?0:n; }
-function fmtYm(ym){ const m=String(ym).match(/(\d{4})-(\d{1,2})/); return m ? (m[1]+'年'+Number(m[2])+'月') : String(ym); }
 
 /* Excelの日付（シリアル or Date）→ Date */
 function toDate(v){
@@ -156,14 +154,19 @@ function parseSheet(ws){
     return best;
   }
 
-  // 有効な売上列＝ sub が売上/売上数 で、左が納品・右が在庫。品目は直近アンカー（2列以内）
+  // 有効な売上列＝ sub が売上/売上数 の列。品目はその列の直近アンカー（ブロック幅ぶん左まで）。
+  // 「納品 … 売上 … 在庫」の間に「廃棄」等の列が増えても拾えるよう、左右の並びは決め打ちしない。
+  // ブロック内に同じ品目の「納品数」があることだけ確認して、金額欄¥の誤検出を防ぐ。
   const soldCols = [];
   for(let c=0;c<sub.length;c++){
-    const s=sub[c], left=sub[c-1]||'', right=sub[c+1]||'';
-    if((s==='売上数'||s==='売上') && right==='在庫' && (left==='納品数'||left==='納品')){
-      const a = nearestCrop(c);
-      if(a && a.c >= c-2) soldCols.push({c:c, name:a.name});
-    }
+    const s=sub[c];
+    if(s!=='売上数' && s!=='売上') continue;
+    const a = nearestCrop(c);
+    if(!a || a.c < c-3) continue;                 // 品目アンカーはブロック幅（最大3列）以内
+    // 同ブロック（アンカー列〜この売上列）に「納品数/納品」があるか＝点数表である確認
+    let hasDeliv = false;
+    for(let k=a.c; k<=c; k++){ if(sub[k]==='納品数'||sub[k]==='納品'){ hasDeliv=true; break; } }
+    if(hasDeliv) soldCols.push({c:c, name:a.name});
   }
   if(!soldCols.length) throw new Error('売上数の列が見つかりません');
 
@@ -279,7 +282,7 @@ function loadMonths(){
       const cur = sel.value;
       sel.innerHTML = '<option value="">全期間</option>';
       (res.months||[]).forEach(m=>{
-        const o=document.createElement('option'); o.value=m; o.textContent=fmtYm(m); sel.appendChild(o);
+        const o=document.createElement('option'); o.value=m; o.textContent=m; sel.appendChild(o);
       });
       if(cur) sel.value = cur;
     }).catch(()=>{});
@@ -320,7 +323,7 @@ function renderMonths(list){
   let html='';
   list.forEach(m=>{
     const w = Math.max(4, Math.round((m.売上数/max)*100));
-    html += '<div class="mrow"><div class="ym">'+esc(fmtYm(m.年月))+'</div>'
+    html += '<div class="mrow"><div class="ym">'+esc(m.年月)+'</div>'
       + '<div class="bar"><i style="width:'+w+'%"></i></div>'
       + '<div class="mv">'+m.売上数+'</div></div>';
   });
