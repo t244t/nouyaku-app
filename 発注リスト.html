@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>発注リスト｜農・みのり</title>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --danger:#B3261E; --danger-bg:#FBEDEC;
+  --warn:#8A5F00; --warn-bg:#FBF3DC;
+  --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  background:var(--paper);color:var(--ink);line-height:1.55;font-feature-settings:"palt";-webkit-font-smoothing:antialiased}
+.wrap{max-width:480px;margin:0 auto;padding:0 14px 120px;min-height:100vh}
+header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand h1{font-size:17px;margin:0;letter-spacing:.04em;font-weight:800}
+.brand .sub{font-size:11px;color:var(--soft);letter-spacing:.08em}
+.back{display:inline-block;margin-top:6px;font-size:12px;color:var(--stem-dk);text-decoration:none}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--soft);font-weight:700;margin:18px 0 8px;display:flex;justify-content:space-between;align-items:center}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;color:var(--soft);cursor:pointer;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--stem);border-color:var(--stem);color:#fff}
+.summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+.sbox{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}
+.sbox b{display:block;font-size:22px;line-height:1.2}
+.sbox span{font-size:11px;color:var(--soft);font-weight:700}
+.sbox.red b{color:var(--danger)} .sbox.yel b{color:var(--warn)}
+.memo-btn{width:100%;margin-top:12px;padding:13px;border:0;border-radius:12px;background:var(--stem);color:#fff;font:inherit;font-size:15px;font-weight:800;cursor:pointer}
+.memo-btn:disabled{opacity:.45}
+.item{display:flex;gap:10px;align-items:center;width:100%;text-align:left;font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer}
+.item.need{border-color:#EBC9C6;background:var(--danger-bg)}
+.item.wait{border-color:#EAD9A8;background:var(--warn-bg)}
+.item .ic{flex:0 0 auto;width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#EEF2EA;font-size:18px}
+.item .bd{flex:1;min-width:0}
+.item .nm{font-size:15px;font-weight:800;word-break:break-word}
+.item .mt{font-size:12px;color:var(--soft);margin-top:2px}
+.item .tag{flex:0 0 auto;font-size:11px;font-weight:800;border-radius:999px;padding:3px 9px;background:#EEF2EA;color:var(--stem-dk)}
+.item.need .tag{background:var(--danger);color:#fff}
+.item.wait .tag{background:#E9C76A;color:#3d2c00}
+.empty{text-align:center;color:var(--soft);font-size:13px;padding:22px 10px}
+.fold{font-size:12px;color:var(--stem-dk);background:none;border:0;cursor:pointer;padding:0;font-weight:700}
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.35);opacity:0;pointer-events:none;transition:opacity .2s;z-index:50}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;background:#fff;border-radius:18px 18px 0 0;padding:16px 16px calc(20px + env(safe-area-inset-bottom));
+  transform:translateY(105%);transition:transform .25s;z-index:51;max-height:88vh;overflow:auto}
+.sheet.on{transform:none}
+.sheet h2{font-size:16px;margin:0 0 2px}
+.sheet .now{font-size:13px;color:var(--soft);margin-bottom:12px}
+.field{margin-bottom:10px}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--soft);margin-bottom:4px}
+.field input,.field textarea{width:100%;font:inherit;font-size:16px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.field textarea{min-height:200px;font-size:14px;line-height:1.6}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.hint{font-size:11.5px;color:var(--soft);margin-top:3px}
+.btn{width:100%;padding:13px;border:0;border-radius:12px;font:inherit;font-size:15px;font-weight:800;cursor:pointer;margin-top:8px;min-height:46px}
+.btn.pri{background:var(--stem);color:#fff}
+.btn.sec{background:#fff;color:var(--stem-dk);border:1px solid var(--line)}
+.btn.warn{background:#E9C76A;color:#3d2c00}
+.btn.del{background:#fff;color:var(--danger);border:1px solid #E6B4AE}
+.btn:disabled{opacity:.5}
+a.btn{display:block;text-align:center;text-decoration:none}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18231A;color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand"><span>📦</span><h1>発注リスト</h1><span class="sub">農・みのり</span></div>
+    <a class="back" href="index.html">← ホームへ戻る</a>
+  </header>
+
+  <div class="summary">
+    <div class="sbox red"><b id="cNeed">–</b><span>要発注</span></div>
+    <div class="sbox yel"><b id="cWait">–</b><span>入荷待ち</span></div>
+    <div class="sbox"><b id="cSet">–</b><span>発注点を設定済み</span></div>
+  </div>
+  <button class="memo-btn" id="memoBtn" disabled>📝 発注メモを作る</button>
+
+  <div class="chips" id="kinds"></div>
+
+  <div class="eyebrow"><span>発注が必要・入荷待ち</span></div>
+  <div id="listAlert"><div class="empty">読み込み中…</div></div>
+
+  <div class="eyebrow"><span>発注点を設定した資材</span></div>
+  <div id="listSet"></div>
+
+  <div class="eyebrow"><span>まだ設定していない資材</span><button class="fold" id="foldBtn">表示する</button></div>
+  <div id="listUnset" hidden></div>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet" role="dialog" aria-modal="true"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec"
+};
+const FARM_NAME = '農・みのり';
+const $ = id => document.getElementById(id);
+let items = [], kind = 'すべて', showUnset = false;
+
+function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('on'); setTimeout(()=>t.classList.remove('on'),2400); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function num(v){ const n=parseFloat(String(v==null?'':v).replace(/[^\d.\-]/g,'')); return isNaN(n)?null:n; }
+function md(s){ const m=String(s||'').match(/^\d{4}-(\d{1,2})-(\d{1,2})/); return m?(+m[1])+'/'+(+m[2]):String(s||''); }
+async function api(params){
+  const r = await fetch(CONFIG.GAS_URL+'?'+new URLSearchParams(params));
+  return r.json();
+}
+
+/* ---------- 読み込み ---------- */
+async function load(){
+  try{
+    const [s,f,r] = await Promise.all([
+      api({action:'listStock'}).catch(()=>null),
+      api({action:'listFert'}).catch(()=>null),
+      api({action:'listReorder'}).catch(()=>null)
+    ]);
+    if(!r || !r.ok) throw new Error('発注設定を読み込めませんでした（GASの更新・再デプロイは済んでいますか？）');
+    const set = {}; (r.items||[]).forEach(x=>{ set[String(x['資材ID'])]=x; });
+    const list = [];
+    ((s&&s.stock)||[]).forEach(t=>list.push({kind:'農薬', id:String(t['在庫ID']||''), name:t['農薬名']||'(名称未設定)', qty:t['在庫量'], unit:t['単位']||'', wh:t['保管倉庫']||''}));
+    ((f&&f.fert)||[]).forEach(t=>list.push({kind:'肥料', id:String(t['肥料ID']||''), name:t['肥料名']||'(名称未設定)', qty:t['在庫量'], unit:t['単位']||'', wh:t['保管倉庫']||''}));
+    items = list.filter(m=>m.id).map(m=>{
+      const c = set[m.id] || null;
+      const point = c?num(c['発注点']):null, q = num(m.qty);
+      let st = 'unset';
+      if(point!=null){
+        if(q!=null && q<=point) st = c['発注済日'] ? 'wait' : 'need';
+        else st = 'ok';
+      }
+      return Object.assign(m, {conf:c, point:point, q:q, st:st});
+    });
+    render();
+  }catch(e){
+    $('listAlert').innerHTML='<div class="empty">'+esc(e.message||'読み込めませんでした')+'</div>';
+  }
+}
+
+/* ---------- 表示 ---------- */
+function drawKinds(){
+  const opts=['すべて','農薬','肥料'];
+  $('kinds').innerHTML = opts.map(k=>'<button class="chip" aria-pressed="'+(kind===k)+'" data-k="'+k+'">'+k+'</button>').join('');
+  $('kinds').querySelectorAll('.chip').forEach(b=>b.onclick=()=>{ kind=b.dataset.k; render(); });
+}
+function card(m){
+  const ic = m.kind==='農薬'?'🧴':'🌱';
+  const qty = (m.qty!==''&&m.qty!=null)?(esc(m.qty)+esc(m.unit)):'—';
+  let meta = '在庫 '+qty;
+  if(m.point!=null) meta += '　／　発注点 '+esc(m.point)+esc(m.unit);
+  if(m.conf && m.conf['発注先']) meta += '<br>発注先：'+esc(m.conf['発注先']);
+  let tag = m.kind;
+  if(m.st==='need') tag='要発注';
+  else if(m.st==='wait') tag=md(m.conf['発注済日'])+' 発注済';
+  return '<button type="button" class="item '+(m.st==='need'?'need':m.st==='wait'?'wait':'')+'" data-id="'+esc(m.id)+'">'+
+    '<span class="ic">'+ic+'</span><span class="bd"><span class="nm">'+esc(m.name)+'</span><span class="mt" style="display:block">'+meta+'</span></span>'+
+    '<span class="tag">'+esc(tag)+'</span></button>';
+}
+function render(){
+  drawKinds();
+  const v = items.filter(m=>kind==='すべて'||m.kind===kind);
+  const need=v.filter(m=>m.st==='need'), wait=v.filter(m=>m.st==='wait'), ok=v.filter(m=>m.st==='ok'), unset=v.filter(m=>m.st==='unset');
+  $('cNeed').textContent = items.filter(m=>m.st==='need').length;
+  $('cWait').textContent = items.filter(m=>m.st==='wait').length;
+  $('cSet').textContent = items.filter(m=>m.st!=='unset').length;
+  $('memoBtn').disabled = !items.some(m=>m.st==='need');
+  $('listAlert').innerHTML = (need.length||wait.length) ? need.concat(wait).map(card).join('')
+    : '<div class="empty">発注が必要な資材はありません 👍</div>';
+  $('listSet').innerHTML = ok.length ? ok.map(card).join('')
+    : '<div class="empty">発注点を設定すると、ここに並びます。<br>下の「まだ設定していない資材」から選んでください。</div>';
+  $('listUnset').innerHTML = unset.length ? unset.map(card).join('') : '<div class="empty">すべての資材に発注点が設定されています。</div>';
+  $('foldBtn').textContent = (showUnset?'閉じる':'表示する')+'（'+unset.length+'件）';
+  document.querySelectorAll('.item').forEach(b=>b.onclick=()=>openEdit(b.dataset.id));
+}
+$('foldBtn').onclick=()=>{ showUnset=!showUnset; $('listUnset').hidden=!showUnset; render(); };
+
+/* ---------- シート ---------- */
+function openSheet(html){ $('sheet').innerHTML=html; $('scrim').classList.add('on'); $('sheet').classList.add('on'); $('sheet').scrollTop=0; }
+function closeSheet(){ $('scrim').classList.remove('on'); $('sheet').classList.remove('on'); }
+$('scrim').onclick=closeSheet;
+
+function openEdit(id){
+  const m = items.find(x=>x.id===id); if(!m) return;
+  const c = m.conf || {};
+  const qty = (m.qty!==''&&m.qty!=null)?(esc(m.qty)+esc(m.unit)):'—';
+  let html = '<h2>'+esc(m.name)+'</h2><div class="now">'+esc(m.kind)+'　／　今の在庫 '+qty+(m.wh?'　／　📍'+esc(m.wh):'')+'</div>'+
+    '<div class="row2"><div class="field"><label for="e_point">発注点（これ以下で知らせる）</label><input id="e_point" inputmode="decimal" value="'+esc(c['発注点']||'')+'" placeholder="例：1"></div>'+
+    '<div class="field"><label for="e_amount">発注量</label><input id="e_amount" value="'+esc(c['発注量']||'')+'" placeholder="例：3"></div></div>'+
+    '<div class="hint" style="margin:-4px 0 10px">単位は在庫と同じ（'+esc(m.unit||'未設定')+'）です。</div>'+
+    '<div class="field"><label for="e_sup">発注先</label><input id="e_sup" value="'+esc(c['発注先']||'')+'" placeholder="例：JA糸島 前原支店"></div>'+
+    '<div class="field"><label for="e_tel">連絡先（電話・メモ）</label><input id="e_tel" value="'+esc(c['連絡先']||'')+'" placeholder="例：092-000-0000"></div>'+
+    '<button class="btn pri" id="e_save">保存する</button>';
+  if(m.st==='need') html += '<button class="btn warn" id="e_order">発注したので「発注済み」にする</button>';
+  if(m.st==='wait') html += '<button class="btn sec" id="e_unorder">「発注済み」を取り消す</button>';
+  const tel = String(c['連絡先']||'').replace(/[^\d+]/g,'');
+  if(tel.length>=9) html += '<a class="btn sec" href="tel:'+esc(tel)+'">📞 '+esc(c['発注先']||'発注先')+'に電話する</a>';
+  if(m.conf) html += '<button class="btn del" id="e_del">発注点の設定を消す</button>';
+  html += '<button class="btn sec" id="e_close">閉じる</button>';
+  openSheet(html);
+  $('e_close').onclick=closeSheet;
+  $('e_save').onclick=()=>save(m, {});
+  if($('e_order')) $('e_order').onclick=()=>save(m, {ordered:'1'});
+  if($('e_unorder')) $('e_unorder').onclick=()=>save(m, {ordered:'0'});
+  if($('e_del')) $('e_del').onclick=()=>removeConf(m);
+}
+
+async function save(m, extra){
+  const point = $('e_point').value.trim();
+  if(point && num(point)==null){ toast('発注点は数字で入れてください'); return; }
+  const btns = document.querySelectorAll('#sheet .btn'); btns.forEach(b=>b.disabled=true);
+  try{
+    const j = await api(Object.assign({action:'saveReorder', 資材ID:m.id, 種別:m.kind, 名前:m.name, 単位:m.unit,
+      発注点:point, 発注量:$('e_amount').value.trim(), 発注先:$('e_sup').value.trim(), 連絡先:$('e_tel').value.trim()}, extra));
+    if(!j || !j.ok) throw 0;
+    toast(extra.ordered==='1'?'発注済みにしました':extra.ordered==='0'?'取り消しました':'保存しました');
+    closeSheet(); load();
+  }catch(e){ toast('保存できませんでした'); btns.forEach(b=>b.disabled=false); }
+}
+async function removeConf(m){
+  if(!confirm('「'+m.name+'」の発注点の設定を消しますか？\n（在庫の記録は消えません）')) return;
+  try{
+    const j = await api({action:'deleteReorder', 資材ID:m.id});
+    if(!j || !j.ok) throw 0;
+    toast('設定を消しました'); closeSheet(); load();
+  }catch(e){ toast('消せませんでした'); }
+}
+
+/* ---------- 発注メモ ---------- */
+$('memoBtn').onclick=()=>{
+  const need = items.filter(m=>m.st==='need');
+  const groups = {};
+  need.forEach(m=>{ const k=(m.conf&&m.conf['発注先'])||'（発注先未設定）'; (groups[k]=groups[k]||[]).push(m); });
+  const parts = Object.keys(groups).map(sup=>{
+    const lines = groups[sup].map(m=>{
+      const a = (m.conf&&m.conf['発注量'])||'';
+      return '・'+m.name+'　'+(a?(a+(/\d$/.test(a)?m.unit:'')):'〇'+m.unit);
+    });
+    const head = sup==='（発注先未設定）' ? '【発注先未設定】' : sup+' 御中';
+    return head+'\nいつもお世話になっております。'+FARM_NAME+'です。\n下記の注文をお願いいたします。\n\n'+lines.join('\n')+'\n\nよろしくお願いいたします。';
+  });
+  const text = parts.join('\n\n――――――\n\n');
+  openSheet('<h2>発注メモ</h2><div class="now">発注先ごとにまとめました。必要に応じて直してから送ってください。</div>'+
+    '<div class="field"><label for="m_text">文面</label><textarea id="m_text">'+esc(text)+'</textarea></div>'+
+    '<button class="btn pri" id="m_copy">📋 コピーする</button>'+
+    '<button class="btn sec" id="m_line">LINEで送る</button>'+
+    '<button class="btn sec" id="m_close">閉じる</button>');
+  $('m_close').onclick=closeSheet;
+  $('m_copy').onclick=async()=>{
+    const t=$('m_text').value;
+    try{ await navigator.clipboard.writeText(t); toast('コピーしました'); }
+    catch(e){ $('m_text').select(); document.execCommand('copy'); toast('コピーしました'); }
+  };
+  $('m_line').onclick=()=>{ location.href='https://line.me/R/share?text='+encodeURIComponent($('m_text').value); };
+};
+
+load();
+</script>
+</body>
+</html>
