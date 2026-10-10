@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>作業書｜農・みのり</title>
+<style>
+:root{
+  --paper:#F2F4EF; --card:#fff; --ink:#18231A; --soft:#5A6B58; --line:#DDE3D8;
+  --stem:#2E6B3A; --stem-dk:#1F4F2A; --danger:#B3261E; --danger-bg:#FBEDEC;
+  --warn:#9A6B00; --warn-bg:#FBF3DC; --red:#C62828;
+  --shadow:0 1px 2px rgba(24,35,26,.06),0 4px 16px rgba(24,35,26,.06);
+  --doc:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0}
+body{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  background:var(--paper);color:var(--ink);line-height:1.55;font-feature-settings:"palt";-webkit-font-smoothing:antialiased}
+.wrap{max-width:1120px;margin:0 auto;padding:0 14px 120px;min-height:100vh}
+header{position:sticky;top:0;z-index:30;background:var(--paper);padding:14px 0 8px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:baseline;gap:8px}
+.brand h1{font-size:17px;margin:0;letter-spacing:.04em;font-weight:800}
+.brand .sub{font-size:11px;color:var(--soft);letter-spacing:.08em}
+.back{display:inline-block;margin-top:6px;font-size:12px;color:var(--stem-dk);text-decoration:none}
+.eyebrow{font-size:11px;letter-spacing:.18em;color:var(--soft);font-weight:700;margin:18px 0 8px;
+  display:flex;justify-content:space-between;align-items:center;gap:8px}
+.newbtn{border:0;border-radius:999px;background:var(--stem);color:#fff;font:inherit;font-size:13px;font-weight:800;padding:7px 14px;cursor:pointer;letter-spacing:0}
+
+/* 一覧 */
+.list{display:grid;gap:8px;max-width:640px}
+.doc{display:flex;gap:12px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 12px;cursor:pointer;text-align:left;font:inherit;color:inherit;width:100%}
+.doc.sel{border-color:var(--stem);box-shadow:0 0 0 2px rgba(46,107,58,.15)}
+.doc .d{flex:0 0 3.4em;text-align:center;font-weight:800;line-height:1.15}
+.doc .d small{display:block;font-size:11px;color:var(--soft);font-weight:700}
+.doc .b{flex:1;min-width:0}
+.doc .t{font-weight:800;font-size:15px;word-break:break-word}
+.doc .m{font-size:11.5px;color:var(--soft);margin-top:2px;display:flex;flex-wrap:wrap;gap:4px 8px}
+.pill{font-size:11px;font-weight:800;border-radius:999px;padding:1px 8px;white-space:nowrap}
+.pill.todo{background:var(--warn-bg);color:var(--warn)}
+.pill.done{background:#E3EEE5;color:var(--stem-dk)}
+.pill.need{background:var(--danger-bg);color:var(--danger)}
+.doc.past{opacity:.6}
+.empty{text-align:center;color:var(--soft);font-size:13px;padding:22px 10px;background:var(--card);border:1px dashed var(--line);border-radius:12px}
+
+/* 編集 */
+.editor{display:grid;grid-template-columns:minmax(0,430px) minmax(0,1fr);gap:18px;align-items:start;margin-top:6px}
+@media (max-width:900px){.editor{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;display:grid;gap:14px;box-shadow:var(--shadow)}
+.field{display:grid;gap:6px;min-width:0}
+.lbl{font-size:12px;font-weight:800;color:var(--soft);letter-spacing:.06em}
+select,input,textarea{font:inherit;font-size:16px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:9px 10px;width:100%;min-width:0}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.row3{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:8px}
+@media (max-width:420px){.row3{grid-template-columns:1fr 1fr}.row3>:first-child{grid-column:1/-1}}
+.check{display:flex;align-items:center;gap:8px;font-size:14px}
+.check input{width:auto}
+.item{display:grid;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.item-top{display:grid;grid-template-columns:1.6em 1fr auto;gap:8px;align-items:center}
+.num{font-weight:800;color:var(--stem);text-align:center}
+.sub2{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding-left:calc(1.6em + 8px)}
+.kz .sub2{grid-template-columns:1fr 8.5em}
+.ind{margin-left:calc(1.6em + 8px)}
+@media (max-width:420px){.sub2,.kz .sub2{grid-template-columns:1fr;padding-left:0}.ind{margin-left:0}}
+.item input.need{border-color:var(--danger);background:var(--danger-bg)}
+.del{border:none;background:transparent;color:var(--soft);font-size:20px;line-height:1;padding:2px 6px;cursor:pointer}
+.add{justify-self:start;border:1px dashed var(--stem);background:transparent;color:var(--stem);border-radius:10px;font:inherit;font-size:13px;font-weight:800;padding:7px 12px;cursor:pointer}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer;font-size:13px;font-weight:700;color:var(--soft);background:#fff;position:relative;user-select:none}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip:has(input:checked){background:var(--stem);color:#fff;border-color:var(--stem)}
+.hide{display:none!important}
+.actions{position:sticky;bottom:0;background:var(--card);padding:10px 0 calc(4px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--line);margin:0 -14px -14px;padding-left:14px;padding-right:14px;border-radius:0 0 14px 14px}
+.btn{border:0;border-radius:12px;padding:12px;font:inherit;font-size:14px;font-weight:800;cursor:pointer}
+.btn.main{background:var(--stem);color:#fff;grid-column:1/-1}
+.btn.sub{background:#fff;color:var(--stem-dk);border:1px solid var(--line)}
+.btn.dng{background:#fff;color:var(--danger);border:1px solid #EBC9C6}
+.btn:disabled{opacity:.5}
+
+/* 作業書（配布物の体裁） */
+.sheet{background:#fff;border:1px solid var(--line);border-radius:3px;padding:38px 34px 28px;box-shadow:var(--shadow);font-family:var(--doc);font-size:16px;line-height:1.9;min-width:0}
+@media (max-width:500px){.sheet{padding:24px 16px;font-size:15px}}
+.sheet h2{text-align:center;font-weight:400;font-size:1.65rem;letter-spacing:.08em;margin:0 0 32px}
+.sheet h3{font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans",sans-serif;font-weight:800;font-size:1.02rem;margin:22px 0 4px}
+.sheet p{margin:0}
+.in{padding-left:1.4em}.in2{padding-left:2.8em}
+.rain{color:var(--red);text-decoration:underline;text-underline-offset:4px;margin-left:1em;white-space:nowrap}
+.k{margin-top:12px}
+.tanto{white-space:nowrap}
+.tanto b{display:inline-block;min-width:4.5em;text-align:center;font-weight:400}
+.tanto.blank b{border-bottom:1px solid var(--red)}
+.mochi{text-decoration:underline;text-underline-offset:4px;margin-left:.6em}
+.subs{margin:0;padding-left:2.8em;list-style:none}
+.subs li::before{content:"・"}
+.safety{margin-top:22px;border-left:4px solid var(--warn);background:var(--warn-bg);padding:10px 14px;border-radius:0 6px 6px 0;font-family:"Hiragino Kaku Gothic ProN",sans-serif;font-size:13px;line-height:1.7}
+.safety h4{margin:0 0 4px;color:var(--warn);letter-spacing:.08em}
+.safety ul{margin:0;padding-left:1.2em}
+.stamps{display:flex;justify-content:flex-end;margin-top:18px;font-family:sans-serif}
+.stamp{border:1px solid var(--ink);width:66px;text-align:center;font-size:11px}
+.stamp+.stamp{border-left:none}
+.stamp div:first-child{border-bottom:1px solid var(--ink);padding:2px 0;letter-spacing:.2em}
+.stamp div:last-child{height:50px}
+.saveinfo{font-size:11.5px;color:var(--soft);margin-top:8px;text-align:right}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18231A;color:#fff;
+  padding:10px 18px;border-radius:999px;font-size:13px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:.95}
+</style>
+</head>
+<body>
+<datalist id="names"><option value="石橋"><option value="吉永"><option value="進藤会長"><option value="野中"><option value="梅野"><option value="各自持参"></datalist>
+<datalist id="kenmei-list"><option value="みのり定期除草作業"><option value="みのり定期草刈り作業"><option value="みのり消毒作業"><option value="みのり収穫作業"><option value="みのり植え付け作業"></datalist>
+
+<div class="wrap">
+  <header>
+    <div class="brand"><span>📋</span><h1>作業書</h1><span class="sub">農・みのり</span></div>
+    <a class="back" href="index.html">← ホームへ戻る</a>
+  </header>
+
+  <div class="eyebrow"><span>作業書の一覧</span><button class="newbtn" id="new">＋ 新しく作る</button></div>
+  <div class="list" id="list"><div class="empty">読み込み中…</div></div>
+
+  <div class="eyebrow" id="ed-title">編集</div>
+  <div class="editor">
+    <form class="panel" id="form" autocomplete="off">
+      <div class="field">
+        <label class="lbl" for="kenmei">件名</label>
+        <input id="kenmei" list="kenmei-list" placeholder="例：みのり定期除草作業">
+      </div>
+      <div class="field"><label class="lbl" for="gaiyo">作業概要</label><select id="gaiyo"></select></div>
+      <div class="row2">
+        <div class="field"><label class="lbl" for="status">状態</label>
+          <select id="status"><option>予定</option><option>完了</option><option>中止</option></select></div>
+        <div class="field"><label class="lbl" for="tenki">天候予報</label><select id="tenki"></select></div>
+      </div>
+      <div class="field"><label class="lbl" for="mokuteki">目的</label><input id="mokuteki"></div>
+
+      <div class="field">
+        <span class="lbl">日時</span>
+        <div class="row3">
+          <input type="date" id="date" aria-label="作業日">
+          <select id="start" aria-label="開始時刻"></select>
+          <select id="end" aria-label="終了時刻"></select>
+        </div>
+        <label class="check"><input type="checkbox" id="rain-on"> 雨天時の予備日を入れる</label>
+        <div class="row3" id="rain-box">
+          <input type="date" id="rain-date" aria-label="予備日">
+          <select id="rain-start" aria-label="予備日の開始時刻"></select>
+          <span></span>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="lbl">場所（作業する順に）</span>
+        <div id="places" class="field"></div>
+        <button type="button" class="add" id="add-place">＋ 場所を追加</button>
+      </div>
+
+      <div class="field">
+        <label class="lbl" for="taisho">作業対象</label>
+        <select id="taisho"></select>
+        <input id="taisho-other" class="hide" placeholder="作業対象を入力">
+      </div>
+
+      <div class="field">
+        <span class="lbl">使用機材と担当（担当が空欄の行は赤で表示）</span>
+        <div id="kizai" class="field"></div>
+        <button type="button" class="add" id="add-kizai">＋ 機材を追加</button>
+      </div>
+
+      <div class="field">
+        <span class="lbl">その他関連備品</span>
+        <div class="chips" id="bihin"></div>
+        <div class="row2">
+          <input id="bihin-other" placeholder="ほかの備品（、区切り）" aria-label="ほかの備品">
+          <input id="bihin-tanto" list="names" placeholder="担当" aria-label="備品の担当">
+        </div>
+      </div>
+
+      <div class="field"><label class="lbl" for="biko">備考</label>
+        <textarea id="biko" rows="2" placeholder="集合場所・連絡事項など"></textarea></div>
+
+      <div class="actions">
+        <button type="submit" class="btn main" id="save">保存してみんなと共有</button>
+        <button type="button" class="btn sub" id="copy">LINE用にコピー</button>
+        <button type="button" class="btn sub" id="dup">複製して新規作成</button>
+        <button type="button" class="btn dng hide" id="del" style="grid-column:1/-1">この作業書を削除</button>
+      </div>
+    </form>
+
+    <div>
+      <article class="sheet" id="sheet" aria-live="polite"></article>
+      <div class="saveinfo" id="saveinfo"></div>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const CONFIG = {
+  GAS_URL: "https://script.google.com/macros/s/AKfycbzrKD24LhH_AKetCGNIAHvAFv44EaJIzDMOUI6YFVskY9W2dJj1aBOjW1Im3RBAZfqR/exec"
+};
+const RECORDER = 'あにき';
+const OTHER="その他（入力）";
+const DATA={
+  gaiyo:["草刈り","除草剤散布","草刈り・除草剤散布","耕起","畝立て","マルチ張り","播種","定植","間引き","潅水","追肥・施肥","消毒（農薬散布）","収穫","出荷調整・袋詰め","芋掘り","残渣処理","剪定","溝切り","片付け・清掃"],
+  basho:["ねぎぼうず","ねぎ前上圃場","ねぎ前下圃場","ねぎ横畑","ねぎ横畑先","みかん山","羽根戸田んぼ","西貝塚畑","御床ファーム","みとこファーム","飯盛","貝塚倉庫"],
+  bui:["敷地裏","法面","外回り","圃場内","畝間","ハウス内","倉庫前","全体"],
+  pwork:["草刈り","除草剤散布","手取り除草","ブロワー清掃","耕起","収穫","片付け"],
+  taisho:["上記の場所すべて","法面・外回り","畝間","畑全体","お米","なすび","きゅうり","キャベツ","じゃがいも","スナップエンドウ","さつまいも","オクラ","トウモロコシ","ピーマン","トマト","落花生","レタス","シシトウ","ホウレン草","ニンニク","人参","玉ねぎ","マクワウリ","ルッコラ","大根・カブ","カボチャ","レモン"],
+  kizai:["自走草刈り機（スパイダーモア）","草刈り機","白軽トラ","軽トラ","除草剤タンク・動噴機","燃料（ガソリン・混合油）","飲み物（水分補給用）","ブロワー","管理機","トラクター","潅水タンク・ホース","一輪車","収穫コンテナ"],
+  bihin:["グリホシネート除草剤","計量カップ","背負い動噴","ゴム手袋・マスク","草刈機の替え刃","保護メガネ","熊手・レーキ","ごみ袋","救急箱"],
+  tenki:["天候：未確認","晴れ","くもり","小雨","雨","強風"]
+};
+const SAFETY={
+  "自走草刈り機（スパイダーモア）":"斜面では横移動を基本にし、刈刃の回転中は前方に人を入れない",
+  "草刈り機":"保護メガネ・すね当てを着用。周囲15m以内に人がいないか声かけ",
+  "除草剤タンク・動噴機":"マスク・ゴーグル・手袋を着用。作物にかからない風の弱い時間に散布",
+  "背負い動噴":"風下に立たない。散布後はタンクとホースを洗浄",
+  "燃料（ガソリン・混合油）":"給油はエンジンを止め、冷えてから。火気厳禁",
+  "草刈機の替え刃":"刃の交換はエンジン停止・手袋着用で",
+  "ブロワー":"小石やごみが飛ぶので、人や車に向けない",
+  "飲み物（水分補給用）":"30分ごとを目安に休憩と水分補給",
+  "トラクター":"法面・段差での転倒に注意",
+  "白軽トラ":"積載物の固定を確認。圃場の出入り口で徐行",
+  "軽トラ":"積載物の固定を確認。圃場の出入り口で徐行"
+};
+const MARU="①②③④⑤⑥⑦⑧⑨⑩";
+const WD=["日","月","火","水","木","金","土"];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const opts=(list,sel,other=true)=>list.map(v=>`<option${v===sel?" selected":""}>${esc(v)}</option>`).join("")+(other?`<option${sel===OTHER?" selected":""}>${OTHER}</option>`:"");
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove('on'),2400)}
+function todayStr(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+const jdate=s=>{if(!s)return"（日付未選択）";const d=new Date(s+"T00:00");return`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`};
+const sdate=s=>{if(!s)return"";const d=new Date(s+"T00:00");return`${d.getMonth()+1}月${d.getDate()}日（${WD[d.getDay()]}）`};
+
+/* 選択肢 */
+const times=[];for(let h=5;h<=20;h++)for(const m of["00","30"])times.push(`${h}:${m}`);
+$("gaiyo").innerHTML=opts(DATA.gaiyo,"",false);
+$("tenki").innerHTML=opts(DATA.tenki,"",false);
+$("taisho").innerHTML=opts(DATA.taisho,"",true);
+$("start").innerHTML=opts(times,"8:30",false);
+$("end").innerHTML=`<option value="">終了 未定</option>`+opts(times,"",false);
+$("rain-start").innerHTML=opts(times,"8:30",false);
+$("bihin").innerHTML=DATA.bihin.map((b,i)=>`<label class="chip"><input type="checkbox" id="bihin${i}" value="${esc(b)}">${esc(b)}</label>`).join("");
+
+/* 行 */
+let uid=0;
+function placeRow(p={}){
+  const id=++uid,d=document.createElement("div");d.className="item place";d.dataset.id=id;
+  const oth=p.basho&&!DATA.basho.includes(p.basho);
+  d.innerHTML=`<div class="item-top"><span class="num"></span>
+      <select id="pb${id}" aria-label="場所">${opts(DATA.basho,oth?OTHER:(p.basho||DATA.basho[0]))}</select>
+      <button type="button" class="del" aria-label="この場所を削除">×</button></div>
+    <input id="pbo${id}" class="ind ${oth?"":"hide"}" placeholder="場所を入力" value="${oth?esc(p.basho):""}">
+    <div class="sub2">
+      <select id="pu${id}" aria-label="範囲"><option value="">（範囲なし）</option>${opts(DATA.bui,p.bui||"",false)}</select>
+      <select id="pw${id}" aria-label="作業">${opts(DATA.pwork,p.work||"草刈り",false)}</select>
+    </div>`;
+  $("places").appendChild(d);renumber();
+}
+function kizaiRow(k={}){
+  const id=++uid,d=document.createElement("div");d.className="item kz";d.dataset.id=id;
+  const oth=k.name&&!DATA.kizai.includes(k.name);
+  d.innerHTML=`<div class="item-top"><span class="num">＊</span>
+      <select id="kn${id}" aria-label="機材">${opts(DATA.kizai,oth?OTHER:(k.name||DATA.kizai[0]))}</select>
+      <button type="button" class="del" aria-label="この機材を削除">×</button></div>
+    <input id="kno${id}" class="ind ${oth?"":"hide"}" placeholder="機材名を入力" value="${oth?esc(k.name):""}">
+    <div class="sub2">
+      <input id="kd${id}" placeholder="補足（例：燃料満タン・補充用燃料）" value="${esc(k.note||"")}" aria-label="補足">
+      <input id="kt${id}" list="names" placeholder="担当" value="${esc(k.tanto||"")}" aria-label="担当">
+    </div>`;
+  $("kizai").appendChild(d);
+}
+function renumber(){[...document.querySelectorAll(".place .num")].forEach((n,i)=>n.textContent=MARU[i]||i+1)}
+document.addEventListener("click",e=>{
+  if(e.target.classList.contains("del")&&e.target.closest(".item")){e.target.closest(".item").remove();renumber();render();}
+});
+$("add-place").onclick=()=>{placeRow();render()};
+$("add-kizai").onclick=()=>{kizaiRow();render()};
+
+/* フォーム ⇔ データ */
+function pick(sel,oth){const v=$(sel).value;return v===OTHER?($(oth).value.trim()||"（未入力）"):v}
+function collect(){
+  const places=[...document.querySelectorAll(".place")].map(r=>{const id=r.dataset.id;
+    $("pbo"+id).classList.toggle("hide",$("pb"+id).value!==OTHER);
+    return{basho:pick("pb"+id,"pbo"+id),bui:$("pu"+id).value,work:$("pw"+id).value}});
+  const kizai=[...document.querySelectorAll(".kz")].map(r=>{const id=r.dataset.id;
+    $("kno"+id).classList.toggle("hide",$("kn"+id).value!==OTHER);
+    const t=$("kt"+id);t.classList.toggle("need",!t.value.trim());
+    return{name:pick("kn"+id,"kno"+id),note:$("kd"+id).value.trim(),tanto:t.value.trim()}});
+  $("rain-box").classList.toggle("hide",!$("rain-on").checked);
+  $("taisho-other").classList.toggle("hide",$("taisho").value!==OTHER);
+  const bihin=[...document.querySelectorAll("#bihin input:checked")].map(x=>x.value)
+    .concat($("bihin-other").value.split(/[、,，]/).map(s=>s.trim()).filter(Boolean));
+  $("bihin-tanto").classList.toggle("need",bihin.length>0&&!$("bihin-tanto").value.trim());
+  return{
+    kenmei:$("kenmei").value.trim(),gaiyo:$("gaiyo").value,status:$("status").value,tenki:$("tenki").value,
+    mokuteki:$("mokuteki").value.trim(),date:$("date").value,start:$("start").value,end:$("end").value,
+    rain:$("rain-on").checked?{date:$("rain-date").value,start:$("rain-start").value}:null,
+    places,taisho:$("taisho").value===OTHER?($("taisho-other").value.trim()||"（未入力）"):$("taisho").value,
+    kizai,bihin,bihinTanto:$("bihin-tanto").value.trim(),biko:$("biko").value.trim()
+  };
+}
+function fill(o){
+  o=o||{};
+  $("kenmei").value=o.kenmei||"";
+  $("gaiyo").value=o.gaiyo||DATA.gaiyo[0];
+  $("status").value=o.status||"予定";
+  $("tenki").value=o.tenki||DATA.tenki[0];
+  $("mokuteki").value=o.mokuteki||"";
+  $("date").value=o.date||todayStr();
+  $("start").value=o.start||"8:30";
+  $("end").value=o.end||"";
+  $("rain-on").checked=!!o.rain;
+  $("rain-date").value=o.rain?o.rain.date:"";
+  $("rain-start").value=o.rain?o.rain.start:"8:30";
+  $("places").innerHTML="";(o.places&&o.places.length?o.places:[{}]).forEach(placeRow);
+  if(o.taisho&&!DATA.taisho.includes(o.taisho)){$("taisho").value=OTHER;$("taisho-other").value=o.taisho}
+  else{$("taisho").value=o.taisho||DATA.taisho[0];$("taisho-other").value=""}
+  $("kizai").innerHTML="";(o.kizai&&o.kizai.length?o.kizai:[{}]).forEach(kizaiRow);
+  const bh=o.bihin||[];
+  document.querySelectorAll("#bihin input").forEach(c=>c.checked=bh.includes(c.value));
+  $("bihin-other").value=bh.filter(b=>!DATA.bihin.includes(b)).join("、");
+  $("bihin-tanto").value=o.bihinTanto||"";
+  $("biko").value=o.biko||"";
+  render();
+}
+
+/* 表示 */
+const placeText=p=>`${p.basho}${p.bui?"　"+p.bui:""}　${p.work}`;
+const taishoText=o=>o.taisho==="上記の場所すべて"&&o.places.length?(o.places.length>1?`${MARU[0]}〜${MARU[o.places.length-1]}`:MARU[0]):o.taisho;
+function needCount(o){return o.kizai.filter(k=>!k.tanto).length+(o.bihin&&o.bihin.length&&!o.bihinTanto?1:0)}
+function safetyList(o){
+  const s=new Set();
+  o.kizai.forEach(k=>SAFETY[k.name]&&s.add(`${k.name}：${SAFETY[k.name]}`));
+  (o.bihin||[]).forEach(b=>SAFETY[b]&&s.add(`${b}：${SAFETY[b]}`));
+  if(o.tenki==="強風"&&/散布/.test(o.gaiyo+o.places.map(p=>p.work).join()))s.add("強風予報のため、除草剤散布は中止・延期を検討");
+  return[...s];
+}
+const tantoHtml=t=>t==="各自持参"?`<span class="mochi">各自持参</span>`:`<span class="tanto${t?"":" blank"}">（<b>${t?esc(t):"　　"}</b>）担当</span>`;
+function render(){
+  const o=collect(),sf=safetyList(o);
+  $("sheet").innerHTML=`
+    <h2>${esc(o.kenmei||"（件名未入力）")}</h2>
+    <h3>1.　${esc(o.gaiyo)} 実施概要</h3>
+    <div class="in">
+      ${o.mokuteki?`<p>目的：${esc(o.mokuteki)}</p>`:""}
+      <p>日時：${jdate(o.date)}　${o.start}〜${o.end||""}${o.rain?`<span class="rain">※雨天の場合　${sdate(o.rain.date)}　${o.rain.start}〜</span>`:""}</p>
+      <p>場所：</p>
+      ${o.places.map((p,i)=>`<p style="padding-left:1em">${MARU[i]||i+1}${esc(placeText(p))}</p>`).join("")}
+    </div>
+    <h3>2.　作業対象と使用機材</h3>
+    <div class="in"><p>作業対象は、${esc(taishoText(o))}。</p><p>使用予定機材は以下の通り。</p></div>
+    <div class="in2">
+      ${o.kizai.map(k=>`<div class="k">${k.note
+        ?`<p>＊${esc(k.name)}</p><p style="padding-left:1em">${esc(k.note)}　${tantoHtml(k.tanto)}</p>`
+        :`<p>＊${esc(k.name)}　${tantoHtml(k.tanto)}</p>`}</div>`).join("")}
+      ${o.bihin.length?`<div class="k"><p>＊その他関連　備品　${tantoHtml(o.bihinTanto)}</p></div>`:""}
+    </div>
+    ${o.bihin.length?`<ul class="subs">${o.bihin.map(b=>`<li>${esc(b)}</li>`).join("")}</ul>`:""}
+    ${o.biko?`<h3>3.　備考</h3><div class="in"><p>${esc(o.biko).replace(/\n/g,"<br>")}</p></div>`:""}
+    ${sf.length?`<div class="safety"><h4>安全確認</h4><ul>${sf.map(s=>`<li>${esc(s)}</li>`).join("")}</ul></div>`:""}
+    <div class="stamps">${["作成","確認","完了"].map(s=>`<div class="stamp"><div>${s}</div><div></div></div>`).join("")}</div>`;
+}
+function asText(o){
+  const t=x=>x==="各自持参"?"各自持参":`（${x||"　　"}）担当`,sf=safetyList(o);
+  return[`【${o.kenmei||"作業書"}】`,
+    `■日時：${jdate(o.date)} ${o.start}〜${o.end||""}`+(o.rain?`\n※雨天の場合 ${sdate(o.rain.date)} ${o.rain.start}〜`:""),
+    o.mokuteki?`■目的：${o.mokuteki}`:null,
+    `■場所：\n${o.places.map((p,i)=>`${MARU[i]||i+1}${placeText(p)}`).join("\n")}`,
+    `■作業対象：${taishoText(o)}`,
+    `■使用機材：\n${o.kizai.map(k=>`＊${k.name}${k.note?`（${k.note}）`:""} ${t(k.tanto)}`).join("\n")}`+
+      (o.bihin.length?`\n＊その他関連備品 ${t(o.bihinTanto)}\n${o.bihin.map(b=>"　・"+b).join("\n")}`:""),
+    o.biko?`■備考：${o.biko}`:null,
+    needCount(o)?`\n担当が決まっていない項目が${needCount(o)}件あります。作業書アプリから書き込んでください。`:null,
+    sf.length?`\n⚠安全確認\n${sf.map(s=>"・"+s).join("\n")}`:null
+  ].filter(Boolean).join("\n");
+}
+$("form").addEventListener("input",render);$("form").addEventListener("change",render);
+
+/* 共有（GAS） */
+let docs=[],curId="";
+async function api(params){
+  const r=await fetch(CONFIG.GAS_URL+"?"+new URLSearchParams(params).toString());
+  const j=await r.json();if(!j||!j.ok)throw new Error(j&&j.error||"error");return j;
+}
+async function loadList(selectId){
+  try{
+    const j=await api({action:"listSagyosho"});
+    docs=j.items||[];
+    drawList();
+    if(selectId)openDoc(selectId);
+  }catch(e){
+    $("list").innerHTML='<div class="empty">読み込めませんでした。<br><small>GASに作業書.gsを追加して再デプロイ済みか確認してください。</small></div>';
+  }
+}
+function drawList(){
+  if(!docs.length){$("list").innerHTML='<div class="empty">まだ作業書がありません。<br>「＋ 新しく作る」から作成してください。</div>';return}
+  const td=todayStr();
+  $("list").innerHTML=docs.map(d=>{
+    const o=d.data||{},n=needCount({kizai:o.kizai||[],bihin:o.bihin||[],bihinTanto:o.bihinTanto});
+    const dt=o.date?new Date(o.date+"T00:00"):null;
+    const past=o.date&&o.date<td&&d.status!=="予定";
+    return`<button type="button" class="doc${d.id===curId?" sel":""}${past?" past":""}" data-id="${esc(d.id)}">
+      <div class="d">${dt?`${dt.getMonth()+1}/${dt.getDate()}<small>${WD[dt.getDay()]}曜</small>`:"—"}</div>
+      <div class="b"><div class="t">${esc(o.kenmei||"（件名未入力）")}</div>
+        <div class="m"><span class="pill ${d.status==="完了"?"done":"todo"}">${esc(d.status||"予定")}</span>
+        ${n?`<span class="pill need">担当未定 ${n}件</span>`:""}
+        <span>${esc((o.places||[]).map(p=>p.basho).join("・"))}</span>
+        <span>更新 ${esc(d.updated||"")}${d.updatedBy?"（"+esc(d.updatedBy)+"）":""}</span></div></div>
+    </button>`}).join("");
+}
+$("list").addEventListener("click",e=>{const b=e.target.closest(".doc");if(b)openDoc(b.dataset.id,true)});
+function openDoc(id,scroll){
+  const d=docs.find(x=>x.id===id);if(!d)return;
+  curId=id;const o=Object.assign({},d.data,{status:d.status||(d.data&&d.data.status)});fill(o);drawList();
+  $("ed-title").textContent="編集中：「"+(o.kenmei||"作業書")+"」";
+  $("del").classList.remove("hide");
+  $("saveinfo").textContent="最終更新 "+(d.updated||"")+(d.updatedBy?"（"+d.updatedBy+"）":"");
+  if(scroll)$("ed-title").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function newDoc(base){
+  curId="";fill(base||{});drawList();
+  $("ed-title").textContent=base?"新規作成（複製）":"新規作成";
+  $("del").classList.add("hide");$("saveinfo").textContent="まだ保存していません";
+}
+$("new").onclick=()=>{newDoc();$("ed-title").scrollIntoView({behavior:"smooth"})};
+$("dup").onclick=()=>{const o=collect();o.status="予定";o.date=todayStr();o.rain=null;newDoc(o);toast("複製しました。日付を確認して保存してください")};
+$("form").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const o=collect();
+  if(!o.kenmei){$("kenmei").focus();toast("件名を入れてください");return}
+  const btn=$("save");btn.disabled=true;btn.textContent="保存中…";
+  try{
+    const j=await api({action:"saveSagyosho",id:curId,status:o.status,by:RECORDER,data:JSON.stringify(o)});
+    toast("保存しました。みんなの一覧に反映されます");
+    await loadList(j.id);
+  }catch(err){toast("保存できませんでした")}
+  finally{btn.disabled=false;btn.textContent="保存してみんなと共有"}
+});
+$("del").onclick=async()=>{
+  if(!curId)return;
+  if(!confirm("この作業書を削除しますか？"))return;
+  try{await api({action:"deleteSagyosho",id:curId});toast("削除しました");newDoc();loadList()}
+  catch(e){toast("削除できませんでした")}
+};
+$("copy").onclick=async()=>{
+  const text=asText(collect());
+  try{await navigator.clipboard.writeText(text);toast("コピーしました。LINEに貼り付けできます")}
+  catch(e){const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();
+    try{document.execCommand("copy");toast("コピーしました")}catch(_){toast("コピーできませんでした")}ta.remove()}
+};
+
+/* 起動：#id 付きで開くとその作業書を表示 */
+newDoc();
+loadList(decodeURIComponent(location.hash.slice(1))||"");
+</script>
+</body>
+</html>
