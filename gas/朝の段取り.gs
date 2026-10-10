@@ -172,22 +172,26 @@ function buildMorningText_() {
   }
 
   // ---- 収穫 ----
-  var harvNow = [], harvSoon = [];
+  // 作物ごとにまとめる（例：さつまいも（ねぎ前上・御床ファーム））
+  var nowMap = {}, nowOrder = [], harvSoon = [];
   plantings.forEach(function (p) {
     var hs = String(p['収穫開始'] || '').slice(0, 10), he = String(p['収穫終了'] || '').slice(0, 10) || hs;
     if (!hs) return;
-    var label = (p['圃場'] ? p['圃場'] + 'の' : '') + (p['作物'] || '');
-    if (td >= hs && td <= he) harvNow.push(label);
-    else if (td < hs) {
+    var crop = p['作物'] || '（作物名なし）', field = p['圃場'] || '';
+    if (td >= hs && td <= he) {
+      if (!nowMap[crop]) { nowMap[crop] = []; nowOrder.push(crop); }
+      if (field && nowMap[crop].indexOf(field) < 0) nowMap[crop].push(field);
+    } else if (td < hs) {
       var days = Math.round((new Date(hs + 'T00:00:00+09:00') - new Date(td + 'T00:00:00+09:00')) / 86400000);
-      if (days <= 7) harvSoon.push(label + '（あと' + days + '日）');
+      if (days <= 7) harvSoon.push(crop + (field ? '（' + field + '）' : '') + 'あと' + days + '日');
     }
   });
+  var harvNow = nowOrder.map(function (c) { return c + (nowMap[c].length ? '（' + nowMap[c].join('・') + '）' : ''); });
   if (harvNow.length || harvSoon.length) {
     L.push('');
     L.push('🌾 収穫');
-    if (harvNow.length) L.push('収穫中：' + harvNow.join('・'));
-    if (harvSoon.length) L.push('まもなく：' + harvSoon.join('・'));
+    harvNow.forEach(function (s) { L.push('・収穫中　' + s); });
+    harvSoon.forEach(function (s) { L.push('・まもなく　' + s); });
   }
 
   // ---- やることメモ ----
@@ -259,10 +263,11 @@ function dayWx_(d, i) {
 }
 
 function wxLine_(w) {
+  // 降水確率（気象庁）があればそれを優先し、無いときだけ降水量で判断する
   var icon = '☀️';
   if (w.snow != null && w.snow > 0) icon = '⛄';
-  else if ((w.prob != null && w.prob >= 60) || (w.precip != null && w.precip >= 5)) icon = '☔';
-  else if ((w.prob != null && w.prob >= 30) || (w.precip != null && w.precip >= 1)) icon = '☁️';
+  else if (w.prob != null) icon = w.prob >= 60 ? '☔' : (w.prob >= 30 ? '☁️' : '☀️');
+  else if (w.precip != null) icon = w.precip >= 5 ? '☔' : (w.precip >= 1 ? '☁️' : '☀️');
   var s = icon + ' ';
   if (w.tmax != null) s += w.tmax + '℃';
   if (w.tmin != null) s += '/' + w.tmin + '℃';
