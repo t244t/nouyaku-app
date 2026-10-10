@@ -381,8 +381,25 @@ $("form").addEventListener("input",render);$("form").addEventListener("change",r
 /* 共有（GAS） */
 let docs=[],curId="";
 async function api(params){
-  const r=await fetch(CONFIG.GAS_URL+"?"+new URLSearchParams(params).toString());
-  const j=await r.json();if(!j||!j.ok)throw new Error(j&&j.error||"error");return j;
+  let r;
+  try{r=await fetch(CONFIG.GAS_URL+"?"+new URLSearchParams(params).toString())}
+  catch(e){throw new Error("GASにつながりません")}
+  return readJson(r);
+}
+/* 保存はアプリの他の機能と同じく POST（Content-Type未指定＝単純リクエスト） */
+async function apiPost(body){
+  let r;
+  try{r=await fetch(CONFIG.GAS_URL,{method:"POST",body:JSON.stringify(body)})}
+  catch(e){throw new Error("GASにつながりません")}
+  return readJson(r);
+}
+async function readJson(r){
+  const txt=await r.text();let j=null;
+  try{j=JSON.parse(txt)}catch(e){
+    throw new Error(/<html|<!DOCTYPE/i.test(txt)?"GASがエラー画面を返しました（作業書.gsの追加・再デプロイを確認）":"GASの応答を読めません");
+  }
+  if(!j||!j.ok)throw new Error((j&&j.error)||"GASが「保存できない」と返しました");
+  return j;
 }
 async function loadList(selectId){
   try{
@@ -391,7 +408,7 @@ async function loadList(selectId){
     drawList();
     if(selectId)openDoc(selectId);
   }catch(e){
-    $("list").innerHTML='<div class="empty">読み込めませんでした。<br><small>GASに作業書.gsを追加して再デプロイ済みか確認してください。</small></div>';
+    $("list").innerHTML='<div class="empty">一覧を読み込めませんでした。<br><small>'+esc(e.message)+'</small></div>';
   }
 }
 function drawList(){
@@ -432,17 +449,20 @@ $("form").addEventListener("submit",async e=>{
   if(!o.kenmei){$("kenmei").focus();toast("件名を入れてください");return}
   const btn=$("save");btn.disabled=true;btn.textContent="保存中…";
   try{
-    const j=await api({action:"saveSagyosho",id:curId,status:o.status,by:RECORDER,data:JSON.stringify(o)});
+    const j=await apiPost({action:"saveSagyosho",id:curId,status:o.status,by:RECORDER,data:o});
     toast("保存しました。みんなの一覧に反映されます");
     await loadList(j.id);
-  }catch(err){toast("保存できませんでした")}
+  }catch(err){
+    toast("保存できませんでした："+err.message);
+    $("saveinfo").textContent="保存できませんでした："+err.message;
+  }
   finally{btn.disabled=false;btn.textContent="保存してみんなと共有"}
 });
 $("del").onclick=async()=>{
   if(!curId)return;
   if(!confirm("この作業書を削除しますか？"))return;
   try{await api({action:"deleteSagyosho",id:curId});toast("削除しました");newDoc();loadList()}
-  catch(e){toast("削除できませんでした")}
+  catch(e){toast("削除できませんでした："+e.message)}
 };
 $("copy").onclick=async()=>{
   const text=asText(collect());
