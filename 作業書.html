@@ -100,6 +100,20 @@ select,input,textarea{font:inherit;font-size:16px;color:var(--ink);background:#f
 .stamp div:first-child{border-bottom:1px solid var(--ink);padding:2px 0;letter-spacing:.2em}
 .stamp div:last-child{height:50px}
 .saveinfo{font-size:11.5px;color:var(--soft);margin-top:8px;text-align:right}
+/* 印刷：作業書の紙面だけをA4に */
+@page{size:A4 portrait;margin:18mm 20mm}
+@media print{
+  html,body{background:#fff!important}
+  header,.eyebrow,.list,#form,.saveinfo,.toast{display:none!important}
+  .wrap{max-width:none;padding:0;min-height:0}
+  .editor{display:block;margin:0}
+  .sheet{border:none;box-shadow:none;padding:0;font-size:12pt;line-height:1.85}
+  .sheet h2{font-size:20pt;margin-bottom:26pt}
+  .tanto.blank b{border-bottom-color:#000}
+  .safety{border-left-color:#999;background:none;padding:6pt 10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rain{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .k,.safety,.stamps{break-inside:avoid}
+}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#18231A;color:#fff;
   padding:10px 18px;border-radius:999px;font-size:13px;z-index:99;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:.95}
@@ -180,6 +194,7 @@ select,input,textarea{font:inherit;font-size:16px;color:var(--ink);background:#f
 
       <div class="actions">
         <button type="submit" class="btn main" id="save">保存してみんなと共有</button>
+        <button type="button" class="btn sub" id="print" style="grid-column:1/-1">🖨 印刷する（A4）</button>
         <button type="button" class="btn sub" id="copy">LINE用にコピー</button>
         <button type="button" class="btn sub" id="dup">複製して新規作成</button>
         <button type="button" class="btn dng hide" id="del" style="grid-column:1/-1">この作業書を削除</button>
@@ -469,6 +484,19 @@ $("copy").onclick=async()=>{
   try{await navigator.clipboard.writeText(text);toast("コピーしました。LINEに貼り付けできます")}
   catch(e){const ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();
     try{document.execCommand("copy");toast("コピーしました")}catch(_){toast("コピーできませんでした")}ta.remove()}
+};
+
+/* 印刷：LINE内ブラウザは印刷できないので、外部ブラウザで同じ作業書を開き直す */
+const inLine=/\bLine\//i.test(navigator.userAgent);
+$("print").onclick=()=>{
+  render();
+  if(inLine){
+    if(!curId){toast("先に「保存してみんなと共有」を押してください");return}
+    toast("Safari／Chromeで開きます。開いたら印刷を押してください");
+    location.href=location.pathname+"?openExternalBrowser=1#"+encodeURIComponent(curId);
+    return;
+  }
+  window.print();
 };
 
 /* 起動：#id 付きで開くとその作業書を表示 */
